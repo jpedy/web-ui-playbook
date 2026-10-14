@@ -1,0 +1,200 @@
+/* ==========================================================================
+   web-ui-playbook — Tailwind CSS v4 token starter
+   Paste into resources/css/app.css (Laravel) or src/app.css (standalone).
+   Then edit ONLY the values marked EDIT to fit the chosen style direction
+   (references/visual-direction.md). Templates must use the semantic
+   utilities this file creates: bg-bg, bg-surface, bg-surface-subtle,
+   text-text, text-muted, border-border, bg-primary, text-primary-fg,
+   hover:bg-primary-hover, bg-primary-subtle, text-success/-warning/-danger,
+   bg-success-subtle…, outline-focus, rounded-sm/md/lg/xl, shadow-sm/md/lg,
+   font-sans / font-fa / font-mono, text-display / text-h1 / text-h2.
+   Default palette: "Calm SaaS" blue on slate — all text pairs ≥ 4.5:1.
+
+   COPY this file into the project (e.g. resources/css/tokens.css or src/tokens.css)
+   and `@import "./tokens.css";` from app.css. Do not @import it from the skill
+   folder: its `@import "tailwindcss"` resolves relative to this file and fails
+   outside a folder with node_modules (found in testing).
+
+   Dense apps/dashboards: body text is 14px, not the fluid 16–18px marketing size —
+   add to app.css:   @layer base { body { font-size: 0.875rem; line-height: 1.45; } }
+   Inputs, checkboxes and selects use border-border-strong (≥3:1, WCAG 1.4.11).
+   ========================================================================== */
+
+@import "tailwindcss";
+
+/* Fonts: self-hosted only (never a font CDN).
+   Laravel/Vite: uncomment these two imports after
+   `npm i @fontsource-variable/inter @fontsource-variable/vazirmatn`.
+   Standalone Tailwind CLI: copy the woff2 files into /fonts and use
+   @font-face instead (see references/performance-and-tech.md §9). */
+/* @import "@fontsource-variable/inter"; */
+/* @import "@fontsource-variable/vazirmatn"; */
+
+/* Dark mode via a .dark class on <html> (set before paint, see bottom). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------- Semantic color variables (light) — EDIT per project ---------- */
+:root {
+  --bg: oklch(0.985 0.002 248);            /* page background  ≈ #F9FAFB */
+  --surface: oklch(1 0 0);                 /* cards, inputs     #FFFFFF */
+  --surface-subtle: oklch(0.967 0.003 265);/* hover rows, wells ≈ #F3F4F6 */
+  --border: oklch(0.928 0.006 265);        /* 1px borders       ≈ #E5E7EB */
+  --border-strong: oklch(0.551 0.027 264); /* input/checkbox borders ≈ #6B7280 (≥3:1 on white, WCAG 1.4.11) */
+  --text: oklch(0.21 0.034 265);           /* body/headings     ≈ #111827 (17.7:1) */
+  --muted: oklch(0.446 0.026 257);         /* secondary text    ≈ #4B5563 (7.6:1) */
+
+  --primary: oklch(0.546 0.215 263);       /* EDIT brand action ≈ #2563EB (white text 5.2:1) */
+  --primary-hover: oklch(0.488 0.217 264); /* EDIT one step darker ≈ #1D4ED8 */
+  --primary-fg: oklch(1 0 0);              /* text on primary */
+  --primary-subtle: oklch(0.97 0.014 255); /* selected/active bg ≈ #EFF6FF */
+  --accent: oklch(0.769 0.165 70);         /* EDIT optional highlight (badges, illustrations; not for small text) */
+
+  --success: oklch(0.527 0.154 150);       /* #15803D (5.0:1) */
+  --success-subtle: oklch(0.982 0.018 155);
+  --warning: oklch(0.555 0.163 49);        /* #B45309 (5.0:1) */
+  --warning-subtle: oklch(0.987 0.022 95);
+  --danger: oklch(0.577 0.245 27);         /* #DC2626 (4.8:1) */
+  --danger-subtle: oklch(0.971 0.013 17);
+  --info: oklch(0.546 0.215 263);
+  --info-subtle: oklch(0.97 0.014 255);
+
+  --focus: oklch(0.546 0.215 263);         /* focus ring (≥3:1 vs bg) */
+}
+
+/* ---------- Dark mode values ---------- */
+.dark {
+  --bg: oklch(0.18 0.02 265);              /* ≈ #0B0F17, never pure black */
+  --surface: oklch(0.22 0.02 265);         /* +elevation = lighter */
+  --surface-subtle: oklch(0.26 0.02 265);
+  --border: oklch(1 0 0 / 0.1);
+  --border-strong: oklch(1 0 0 / 0.28);
+  --text: oklch(0.93 0.01 265);            /* ≈ #E5E7EB, not pure white */
+  --muted: oklch(0.72 0.02 262);           /* ≈ #9CA3AF, passes on dark bg */
+
+  --primary: oklch(0.70 0.15 258);         /* lighter in dark mode */
+  --primary-hover: oklch(0.76 0.13 258);
+  --primary-fg: oklch(0.18 0.02 265);      /* dark text on light primary */
+  --primary-subtle: oklch(0.30 0.06 262);
+  --accent: oklch(0.80 0.15 75);
+
+  --success: oklch(0.78 0.16 152);
+  --success-subtle: oklch(0.28 0.05 152);
+  --warning: oklch(0.82 0.15 75);
+  --warning-subtle: oklch(0.30 0.05 70);
+  --danger: oklch(0.72 0.17 22);
+  --danger-subtle: oklch(0.30 0.07 22);
+  --info: oklch(0.72 0.14 255);
+  --info-subtle: oklch(0.30 0.06 262);
+
+  --focus: oklch(0.75 0.14 258);
+  color-scheme: dark;
+}
+
+/* ---------- Map variables to Tailwind utilities ---------- */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-subtle: var(--primary-subtle);
+  --color-accent: var(--accent);
+  --color-success: var(--success);
+  --color-success-subtle: var(--success-subtle);
+  --color-warning: var(--warning);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-danger: var(--danger);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-info: var(--info);
+  --color-info-subtle: var(--info-subtle);
+  --color-focus: var(--focus);
+}
+
+/* ---------- Static tokens ---------- */
+@theme {
+  /* Fonts — EDIT per direction. Latin font first, Persian fallback (bilingual-safe).
+     Persian-only projects: persian-base.css switches :lang(fa) to --font-fa. */
+  --font-sans: "Inter Variable", "Inter", "Vazirmatn Variable", "Vazirmatn", ui-sans-serif, system-ui, sans-serif;
+  --font-fa: "Vazirmatn Variable", "Vazirmatn", Tahoma, ui-sans-serif, sans-serif;
+  /* System mono stack (no download). To use JetBrains Mono, self-host it first, then prepend it. */
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* Fluid type (Latin values; Persian sizes/line-heights: persian-base.css) */
+  --text-display: clamp(2.25rem, 1.5rem + 3.5vw, 4.25rem);
+  --text-display--line-height: 1.08;
+  --text-display--letter-spacing: -0.025em;
+  --text-h1: clamp(2rem, 1.4rem + 2.6vw, 3rem);
+  --text-h1--line-height: 1.12;
+  --text-h2: clamp(1.75rem, 1.3rem + 2vw, 2.75rem);
+  --text-h2--line-height: 1.18;
+  --text-body: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
+  --text-body--line-height: 1.6;
+
+  /* Radius — EDIT personality: sharp (4/6/8/12) · standard (6/8/12/16) · soft (8/12/16/24) */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Shadows — 3 levels only */
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 4px rgb(0 0 0 / 0.04);
+  --shadow-lg: 0 12px 32px -8px rgb(0 0 0 / 0.16);
+
+  /* Motion */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ---------- Base layer ---------- */
+@layer base {
+  html {
+    scrollbar-gutter: stable;
+    scroll-padding-block-start: 5rem; /* sticky header height + 16px — EDIT */
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  h1, h2, h3 { text-wrap: balance; }
+  p { text-wrap: pretty; }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  ::selection { background: var(--primary-subtle); }
+  img, video { max-inline-size: 100%; block-size: auto; }
+  input, select, textarea, button { font: inherit; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ---------- Dark mode bootstrap (put in <head> BEFORE the CSS) ----------
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('theme');
+      if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches))
+        document.documentElement.classList.add('dark');
+    } catch (e) {}
+  })();
+</script>
+-------------------------------------------------------------------------- */

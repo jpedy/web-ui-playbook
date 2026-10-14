@@ -1,0 +1,24 @@
+{
+  "name": "web-ui-playbook",
+  "owner": {
+    "name": "jpedy"
+  },
+  "metadata": {
+    "description": "UI/UX playbook skill for Laravel + Tailwind and Persian/RTL web interfaces",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "web-ui-playbook",
+      "source": "./",
+      "description": "Self-contained UI/UX playbook: design direction, tokens, components, page patterns, Persian/RTL and Iran rules, curated examples, templates, and a self-audit script.",
+      "version": "1.0.0",
+      "author": {
+        "name": "jpedy"
+      },
+      "license": "MIT",
+      "category": "design",
+      "keywords": ["ui", "ux", "design", "tailwind", "laravel", "rtl", "persian", "iran"]
+    }
+  ]
+}

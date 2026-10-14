@@ -1,0 +1,101 @@
+/* ==========================================================================
+   web-ui-playbook — Persian (fa) / RTL base layer for Tailwind CSS v4
+   Paste AFTER assets/tokens.css. Requires <html lang="fa" dir="rtl">
+   (or lang="fa" dir="rtl" on a Persian block inside an English page).
+
+   Corrected vs. report C's snippet:
+   - Rules are scoped to :lang(fa), not html[dir=rtl] globally, so English
+     fragments marked lang="en" keep their own tracking/italics.
+   - Tailwind's text-* utilities carry their own line-heights; we raise them
+     for Persian by redefining the theme variables inside :lang(fa).
+   - No global font-feature digit swapping (ss01/ss02 differ per font);
+     convert digits in code (persian-helpers.js / PersianHelpers.php).
+   ========================================================================== */
+
+/* Standalone builds (no Vite/fontsource import): self-host the woff2 file.
+@font-face {
+  font-family: "Vazirmatn Variable";
+  src: url("/fonts/vazirmatn-arabic-wght-normal.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+200C-200E, U+FB50-FDFF, U+FE70-FEFF;
+}
+@font-face {   (Latin glyphs of Vazirmatn, optional if Inter is loaded)
+  font-family: "Vazirmatn Variable";
+  src: url("/fonts/vazirmatn-latin-wght-normal.woff2") format("woff2-variations");
+  font-weight: 100 900; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF;
+}
+Preload the arabic file:  <link rel="preload" href="/fonts/vazirmatn-arabic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+*/
+
+@layer base {
+  /* 1. Font + Persian line-heights (raise Tailwind's per-size line-heights) */
+  :lang(fa) {
+    font-family: var(--font-fa);
+    --text-xs--line-height: 1.7;
+    --text-sm--line-height: 1.65;
+    --text-base--line-height: 1.8;
+    --text-lg--line-height: 1.8;
+    --text-xl--line-height: 1.65;
+    --text-2xl--line-height: 1.55;
+    --text-3xl--line-height: 1.5;
+    --text-4xl--line-height: 1.45;
+    --text-5xl--line-height: 1.4;
+    --text-6xl--line-height: 1.35;
+    --text-body--line-height: 1.8;
+    --text-h2--line-height: 1.45;
+    --text-h1--line-height: 1.4;
+    --text-display--line-height: 1.35;
+    --text-display--letter-spacing: 0em;
+  }
+  body:lang(fa) { line-height: 1.8; }
+  :lang(fa) :is(h1, h2, h3, h4, h5, h6) { line-height: 1.45; }
+  :lang(fa) :is(button, input, select, textarea, label) { line-height: 1.55; }
+
+  /* 2. Never tracking / italics / uppercase on Persian (beats utilities:
+        important declarations in an earlier layer win) */
+  :lang(fa) {
+    letter-spacing: 0 !important;
+    font-style: normal !important;
+    text-transform: none !important;
+  }
+  :lang(fa) :is(em, i):not([class*="icon"]) { font-weight: 600; }
+
+  /* 3. English fragments inside Persian pages keep Latin typography */
+  [lang="en"] { font-family: var(--font-sans); }
+
+  /* 4. Underlines clear the dots and descenders */
+  :lang(fa) a { text-underline-offset: 0.38em; text-decoration-skip-ink: auto; }
+
+  /* 5. Code is always LTR */
+  :lang(fa) :is(code, kbd, samp, pre) {
+    direction: ltr;
+    unicode-bidi: isolate;
+    font-family: var(--font-mono);
+  }
+
+  /* 6. LTR-by-nature inputs inside RTL forms (digits read left→right),
+        aligned with the RTL labels */
+  [dir="rtl"] :is(input[type="tel"], input[type="email"], input[type="url"],
+                  input[inputmode="numeric"], input[inputmode="decimal"], input[data-ltr]) {
+    direction: ltr;
+    text-align: right; /* audit-ignore: intentional — LTR digits aligned with RTL labels */
+  }
+  [dir="rtl"] :is(input[type="tel"], input[type="email"], input[type="url"],
+                  input[inputmode="numeric"], input[data-ltr])::placeholder {
+    direction: rtl; /* Persian placeholder text reads naturally */
+  }
+}
+
+@layer components {
+  /* Inline LTR token inside Persian text: phone, email, URL, code, English name */
+  .bidi-ltr { direction: ltr; unicode-bidi: isolate; display: inline-block; }
+
+  /* Directional icons (arrows, chevrons, send, back) — or use rtl:-scale-x-100 */
+  [dir="rtl"] .icon-dir { transform: scaleX(-1); }
+
+  /* OTP boxes / single OTP field */
+  .otp-input { direction: ltr; text-align: center; font-variant-numeric: tabular-nums; }
+}
