@@ -16,6 +16,7 @@
  * house-rule warnings (Persian small text), not failures.
  */
 import fs from 'node:fs';
+import path from 'node:path';
 import { parseColor, composite, contrast, apca, fmtRatio } from './color-core.mjs';
 import { PAIRS, FALLBACK, targetFor, wcagFloor } from './token-pairs.mjs';
 
@@ -75,9 +76,28 @@ function blocks(css) {
 const isDark = (ctx) => ctx.some((s) => /\.dark\b|data-theme\s*=\s*["']?dark|prefers-color-scheme:\s*dark/.test(s));
 const isLight = (ctx) => !isDark(ctx) && /^(:root|html|:host)\b|^@theme/.test(ctx[ctx.length - 1]);
 
+/** Files in cascade order: each file's relative @import chain first (e.g. app.css → tokens.css → palette.css), later wins. */
+function importOrder(list) {
+  const out = [], seen = new Set();
+  const visit = (f) => {
+    const abs = path.resolve(f);
+    if (seen.has(abs)) return;
+    seen.add(abs);
+    if (!fs.existsSync(abs)) { console.error(`Not found: ${f}`); process.exit(2); }
+    for (const m of strip(fs.readFileSync(abs, 'utf8')).matchAll(/@import\s+(?:url\(\s*)?["']([^"']+)["']/g)) {
+      const s = m[1];
+      if (s.startsWith('@') || /^[a-z]+:/i.test(s) || !(/^\.{1,2}\//.test(s) || /\.css$/i.test(s))) continue; // packages like "tailwindcss"
+      const p = path.resolve(path.dirname(abs), s);
+      if (fs.existsSync(p)) visit(p);
+    }
+    out.push(abs);
+  };
+  list.forEach(visit);
+  return out;
+}
+
 const vars = { light: {}, dark: {} };
-for (const f of files) {
-  if (!fs.existsSync(f)) { console.error(`Not found: ${f}`); process.exit(2); }
+for (const f of importOrder(files)) {
   for (const b of blocks(strip(fs.readFileSync(f, 'utf8')))) {
     const mode = isDark(b.context) ? 'dark' : isLight(b.context) ? 'light' : null;
     if (!mode) continue;

@@ -329,6 +329,8 @@ export function buildPalette(opts = {}) {
     }
   }
   const failures = matrix.filter((m) => !m.pass);
+  if (ratio(brandFill, D.bg) < 3) warnings.push(`In dark mode your exact brand color ${brandFill} is only ${fmtRatio(ratio(brandFill, D.bg))}:1 against the dark page, so a logo or heading in it would nearly disappear. Use a light (reversed) logo in dark mode — brand-logo-studio exports one — and text-primary-ink (${D['primary-ink']}) for brand-colored text.`);
+  if (ratio(brandFill, L.surface) < 3) warnings.push(`Your exact brand color ${brandFill} is only ${fmtRatio(ratio(brandFill, L.surface))}:1 on white: fine for large shapes and illustrations, too light for a logo wordmark or text on light backgrounds — use a darker logo version there.`);
 
   // 6. Competitors
   const competitors = [];

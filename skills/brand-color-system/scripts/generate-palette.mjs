@@ -223,7 +223,7 @@ body { margin: 0; font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-seri
 .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
 .panel { background: var(--bg); color: var(--text); border-radius: 14px; padding: 20px; border: 1px solid var(--border); }
 .nav { display: flex; justify-content: space-between; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
-.logo { color: var(--brand); } .muted { color: var(--muted); } .link { color: var(--primary-ink); }
+.logo { color: var(--brand); } .dark .logo { color: ${p.matrix.find((m) => m.mode === 'dark' && m.fg === 'brand' && m.bg === 'surface').ratio >= 3 ? 'var(--brand)' : 'var(--primary-ink)'}; } .muted { color: var(--muted); } .link { color: var(--primary-ink); }
 h2 { margin: 16px 0 4px; font-size: 20px; }
 .btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
 .btn { background: var(--primary); color: var(--primary-fg); border: 0; border-radius: 8px; padding: 10px 16px; font: 600 14px system-ui; }

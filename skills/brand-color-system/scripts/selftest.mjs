@@ -105,6 +105,20 @@ if (fs.existsSync(auditPath)) {
   const whys = new Set(un.map((u) => u.why));
   check(run.status === 1 && errs === 7 && house === 1, `audit --contrast fixture: ${errs} contrast errors (want 7), ${house} house-rule warnings (want 1)`);
   check(un.length === 8 && ['dynamic', 'component', 'image', 'unknown'].every((w) => whys.has(w)), `audit --contrast fixture: ${un.length} unresolved (want 8: dynamic, component, image, unknown)`);
+  // 6. cascade order follows @import (palette imported after tokens must win), whatever the folder order
+  const proj = fs.mkdtempSync(path.join(os.tmpdir(), 'bcs-order-'));
+  fs.mkdirSync(path.join(proj, 'css', 'brand'), { recursive: true });
+  fs.writeFileSync(path.join(proj, 'css', 'app.css'), '@import "tailwindcss";\n@import "./z-tokens.css";\n@import "./brand/palette.css";\n');
+  fs.writeFileSync(path.join(proj, 'css', 'z-tokens.css'), ':root { --bg: #ffffff; --text: #111111; --primary: #fde68a; }\n@theme inline { --color-primary: var(--primary); }\n');
+  fs.writeFileSync(path.join(proj, 'css', 'brand', 'palette.css'), ':root { --primary: #0f766e; }\n');
+  fs.writeFileSync(path.join(proj, 'page.html'), '<html lang="en"><body><button class="bg-primary text-white">Go</button></body></html>\n');
+  const ord = spawnSync(process.execPath, [auditPath, path.join(proj, 'page.html'), '--contrast', '--json', '--css', path.join(proj, 'css')], { encoding: 'utf8' });
+  const ordRes = JSON.parse(ord.stdout || '{}');
+  check(ord.status === 0 && !(ordRes.findings || []).some((f) => f.rule === 'contrast'), 'audit --contrast follows @import order (palette.css overrides tokens)');
+  const cc2 = spawnSync(process.execPath, [path.join(DIR, 'check-contrast.mjs'), path.join(proj, 'css', 'app.css'), '--json'], { encoding: 'utf8' });
+  const prim = JSON.parse(cc2.stdout || '{"results":[]}').results.find((r) => r.fg === 'primary' && r.bg === 'bg');
+  check(prim && prim.ratio > 5, `check-contrast follows @import order (primary on bg ${prim && prim.ratio.toFixed(2)})`);
+  fs.rmSync(proj, { recursive: true, force: true });
 } else console.log('(web-ui-playbook not installed next to this skill — audit.mjs checks skipped)');
 
 console.log(`\nselftest: ${passed} passed, ${failed} failed`);
