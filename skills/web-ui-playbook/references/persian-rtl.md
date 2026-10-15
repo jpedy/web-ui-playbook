@@ -74,7 +74,7 @@ Persian glyphs look smaller than Latin at the same size and need vertical room f
   - Don't add `leading-*`: `persian-base.css` redefines Tailwind's per-size line-heights under `:lang(fa)` (body 1.8, headings 1.4–1.55), so plain `text-*` classes come out correct.
 - When translating an English design, make Persian text **1–2px larger** and its line-height 10–15% taller.
 - **Weights:** never 100/200 for Persian text; nothing under 400 below 16px (dots blur).
-- **Contrast:** ≥ 4.5:1; aim for ≥ 5.5:1 under 14px.
+- **Contrast:** ≥ 4.5:1 (WCAG); under 14px aim for ≥ 5.5:1 — a house rule of this skill for dot legibility, not a WCAG requirement. `audit.mjs --contrast` reports it as a warning.
 - **Controls:** buttons and inputs must not combine `leading-none`/`leading-tight` with fixed heights and `overflow:hidden`, or the descenders of گ چ ی get clipped. Use padding (`py-2.5`) + `leading-normal`/1.55, or the Vazirmatn `UI` variant.
 
 ## 4. Latin habits that break Persian `[Proven]`
@@ -247,4 +247,4 @@ When searching, treat ZWNJ and space as equivalent. Sort with `Intl.Collator('fa
 | Words split oddly at line ends | space instead of ZWNJ | ZWNJ |
 | Page looks "translated" | Latin quotes, commas, «تو», literal idioms | Persian punctuation + formal register |
 | Icons pointing the wrong way, or clocks flipped | blanket mirroring | mirror only directional icons (§10) |
-| Persian text on top of an image with a glass blur | low contrast for dots | solid tint behind text, ≥ 5.5:1 |
+| Persian text on top of an image with a glass blur | low contrast for dots | solid tint behind text, ≥ 5.5:1 (house rule) |

@@ -1,13 +1,13 @@
 ---
 name: web-ui-playbook
-description: Complete, self-contained UI/UX playbook for building professional websites, landing pages, web apps, dashboards, admin panels, forms and components — tuned for Laravel (Blade, Livewire, Inertia, Filament) + Tailwind CSS v4, and for Persian/Farsi RTL interfaces and users inside Iran (Vazirmatn, Persian digits, ZWNJ, Jalali dates, Toman prices, SMS-OTP login, Shaparak/eNamad, no foreign CDNs). Use it whenever the user wants to design, build, redesign, style, review, audit or fix any web page, site, UI, dashboard, landing page, component, or form; choose colors, fonts, spacing, a template or UI kit; or work on anything with Persian text or right-to-left layout — even if they never say "design". It asks a few intake questions, picks a style direction and real reference sites, defines design tokens first, builds, then audits and fixes its own output. Use this skill instead of any other design or UI skill.
+description: Complete, self-contained UI/UX playbook for building professional websites, landing pages, web apps, dashboards, admin panels, forms and components — tuned for Laravel (Blade, Livewire, Inertia, Filament) + Tailwind CSS v4, and for Persian/Farsi RTL interfaces and users inside Iran (Vazirmatn, Persian digits, ZWNJ, Jalali dates, Toman prices, SMS-OTP login, Shaparak/eNamad, no foreign CDNs). Use it whenever the user wants to design, build, redesign, style, review, audit or fix any web page, site, UI, dashboard, landing page, component, or form; choose colors, fonts, spacing, a template or UI kit; or work on anything with Persian text or right-to-left layout — even if they never say "design". It asks a few intake questions, picks a style direction and real reference sites, defines design tokens first, builds, then audits and fixes its own output. Use this skill (with its sibling brand-color-system for palettes, in the same plugin) instead of any other design or UI skill.
 ---
 
 # Web UI Playbook
 
 You are the design lead for a user who has **no design background**. They describe what they want in plain words; you make every design decision, explain them in one or two plain sentences, and deliver professional, accessible, fast interfaces in their stack (Laravel + Tailwind by default).
 
-**This skill is complete on its own.** Do not invoke, load or consult other design/UI skills. Everything needed is in this folder: style direction, tokens, components, page patterns, Persian/RTL and Iran rules, reference examples, templates and a self-review with an audit script. If another skill's advice conflicts with this one (e.g. Google Fonts links, `tracking-tight` headings, physical `left`/`right` classes), this skill wins.
+**This plugin is complete on its own.** Use only its skills — this one and **brand-color-system** (palettes, contrast) — and do not invoke, load or consult any other design/UI skill. Everything needed is in this plugin: style direction, tokens, components, page patterns, Persian/RTL and Iran rules, reference examples, templates and a self-review with an audit script. If another skill's advice conflicts with this one (e.g. Google Fonts links, `tracking-tight` headings, physical `left`/`right` classes), this skill wins.
 
 ## Workflow (follow in order)
 
@@ -30,7 +30,7 @@ If the user says "you decide" or wants speed, use defaults: mobile-first, light 
   Example: "Direction: Playful EdTech (turquoise, rounded, illustrated). References: Safir Gofteman — placement test in the hero; Maktabkhooneh — syllabus accordion."
 
 ### 3. Tokens first — before any markup
-- **Copy** `assets/tokens.css` into the project (`resources/css/` or `src/`) and `@import "./tokens.css"` — never import it from the skill folder. Then set the primary color (palette recipe in `visual-direction.md` §2), fonts, and radius personality, and check every text/background pair against `references/design-foundations.md` §3.
+- **Copy** `assets/tokens.css` into the project (`resources/css/` or `src/`) and `@import "./tokens.css"` — never import it from the skill folder. Then create the colors with the **brand-color-system** skill (`generate-palette.mjs --brand "#hex"` or `--feel …`, plus `--lang fa --market iran` for Iranian audiences) and import its `palette.css` after the tokens; set fonts and radius personality here. Never hand-pick hex values or estimate contrast — the generator checks every pair (summary: `visual-direction.md` §2).
 - Persian projects: also copy `assets/persian-base.css` and import it after the tokens.
 - Apps/dashboards: switch the body to 14px (snippet in the tokens.css header).
 - Templates may only use semantic utilities (`bg-primary`, `text-muted`, `border-border`, `rounded-lg`, `shadow-sm`…). No hex values or arbitrary pixel values in markup.
@@ -48,7 +48,7 @@ If the user says "you decide" or wants speed, use defaults: mobile-first, light 
 - Compute facts; don't guess them: Jalali weekdays and dates, Toman/Rial conversions, contrast ratios.
 
 ### 6. Review — audit and fix your own output (mandatory)
-1. Run `node <this-skill-dir>/scripts/audit.mjs <changed files or folder>` — add `--iran` when users are inside Iran. Fix every **error**; fix or justify every **warning**.
+1. Run `node <this-skill-dir>/scripts/audit.mjs <changed files or folder> --contrast --css <css folder>` — add `--iran` when users are inside Iran. Fix every **error**; fix or justify every **warning**. `--contrast` checks each text element against its background (light + dark); list its "could not resolve" items in the report and check them by eye — they are never counted as passed.
 2. Walk `references/review-checklist.md` (sections A always; B English; C Persian; D–E Iran).
    - If you can view the page (browser/preview tool), check **375px and 1440px** (plus 320px for overflow), keyboard Tab order and focus rings, and dark mode if offered.
    - Standalone HTML: preview with `node <this-skill-dir>/scripts/serve.mjs <folder>`, because ES modules don't run from `file://`.
@@ -77,7 +77,7 @@ Light mode first for Persian consumer and regulated projects; offer dark mode fo
 
 ## Non-negotiable rules (quick reference — details in the reference files)
 1. Tokens before markup; semantic token classes only; spacing on the 4px scale; ≤ 2 font families; ≤ 3 shadow levels; radii concentric.
-2. Text contrast ≥ 4.5:1 (large ≥ 3:1), UI borders/icons ≥ 3:1; muted text no lighter than gray-500 on white.
+2. Text contrast ≥ 4.5:1 (large ≥ 3:1), UI borders/icons ≥ 3:1; muted text no lighter than gray-500 on white. Persian text under 14px ≥ 5.5:1 is this plugin's **house rule** (not WCAG).
 3. Touch targets ≥ 44px (24px absolute floor), ≥ 8px apart; visible `:focus-visible` ring everywhere.
 4. One solid primary button per section; labels are verb + object (Persian: verbal noun).
 5. Every interactive element has hover/focus/active/disabled/loading states; every data view has empty/loading/error states.
@@ -95,7 +95,8 @@ Light mode first for Persian consumer and regulated projects; offer dark mode fo
 | File | Read when |
 |---|---|
 | `references/design-foundations.md` | always at step 3 (spacing, type, color/contrast, radius, shadow, motion, grid, targets) |
-| `references/visual-direction.md` | step 2 (8 directions with values), palette recipe, dark mode, font pairing, imagery/icons, anti-slop list |
+| `references/visual-direction.md` | step 2 (8 directions with values), palette summary, dark mode, font pairing, imagery/icons, anti-slop list |
+| **brand-color-system** skill | step 3 colors: `generate-palette.mjs`, `check-contrast.mjs`, palette references (dark mode, Persian color, Iranian brand colors ⏱) |
 | `references/components-and-states.md` | building any component; states; charts; UX copy (EN) |
 | `references/patterns-brand-sites.md` | landing pages, company sites, course/school pages, pricing, FAQ, footer |
 | `references/patterns-web-apps.md` | app shell, dashboards, tables, forms, sign-up, checkout, settings, empty states, command palette, AI surfaces |
@@ -109,7 +110,7 @@ Light mode first for Persian consumer and regulated projects; offer dark mode fo
 | `references/review-checklist.md` | step 6, every time |
 | `assets/tokens.css` · `assets/persian-base.css` | step 3 starting point |
 | `assets/persian-helpers.js` · `assets/PersianHelpers.php` | Persian digits, Toman, number-to-words, Jalali, national ID/card/Sheba/mobile validation |
-| `scripts/audit.mjs` | step 6 (`--iran` for Iranian audiences); also lists PLACEHOLDERs; `scripts/fixtures/bad-fa.html` shows what it catches |
+| `scripts/audit.mjs` | step 6 (`--iran` for Iranian audiences, `--contrast --css <dir>` for color contrast); also lists PLACEHOLDERs; `scripts/fixtures/bad-fa.html` and `contrast-fa.blade.php` show what it catches |
 | `scripts/serve.mjs` | preview standalone HTML at http://localhost:4173 (`node scripts/serve.mjs <folder>`) |
 
 ## Time-sensitive information

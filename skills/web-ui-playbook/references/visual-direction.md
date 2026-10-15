@@ -51,39 +51,19 @@ Radius: sm/md/lg. Density: control height and card padding. "Signature" is the o
 Default to **light mode first** for Persian and Iranian consumer audiences and for regulated sectors. *(Report B: "regulated → high-contrast light-first".)*
 
 ## 2. Building a palette from one brand color
-(General practice, aligned with report B's oklch guidance.)
+Use the **brand-color-system** skill (same plugin) — don't build ramps by hand. It keeps the user's exact brand color, builds Tailwind-like scales in OKLCH, chooses every token by measured contrast (light and dark), and writes a `palette.css` that drops in after `assets/tokens.css`:
+```bash
+node <brand-color-system>/scripts/generate-palette.mjs --brand "#0f766e" [--lang fa --market iran] --out resources/css/brand
+node <brand-color-system>/scripts/generate-palette.mjs --feel calm --out resources/css/brand   # no brand color yet
+```
+What it decides for you (and explains in plain words):
+- **Brand hue when there is none:** from the direction — trust/fintech = navy/cobalt, Playful EdTech = teal/turquoise (also an Iranian heritage color), Warm Consumer = coral/terracotta, Calm SaaS = blue or indigo (avoid the purple-to-blue cliché).
+- **Buttons:** the exact brand color if white text passes; otherwise a dark label or a darker shade, with the exact color kept as `--brand` for logo and illustrations.
+- **Links and brand-colored text:** `text-primary-ink` (always readable); labels on buttons: `text-primary-fg`.
+- **Neutrals:** grays with a faint brand tint. **Status colors:** fixed hues, moved away from the brand hue if they clash; always shown with an icon and a word.
+- **Proportion:** about 60% neutral surfaces, 30% secondary surfaces and text, ≤ 10% primary/accent. The primary color marks *actions*; if everything is blue, nothing is clickable.
 
-1. **Take one brand hue.** If the user has no brand color, pick it from the direction: blue 255–265 (trust/SaaS), teal/turquoise 190–200 (education, travel; turquoise also has Iranian heritage associations per report C), green 150 (finance, settlement), terracotta 40 (warm), violet 290 (creative — avoid the cliché purple-to-blue gradient).
-2. **Make a 10-step ramp in `oklch(L C H)`:**
-   - Keep H fixed.
-   - L: 0.97, 0.93, 0.87, 0.78, 0.68, 0.58 (≈500), 0.50 (≈600), 0.43 (≈700), 0.36 (≈800), 0.27 (≈900).
-   - C: lowest at the ends (≈0.02–0.05) and highest in the middle (≈0.14–0.22). Lower it if the color looks neon.
-3. **Make a neutral ramp:** same hue, chroma 0.005–0.02 (tinted grays feel designed; pure grays feel default).
-4. **Map to semantic tokens:**
-   - `primary` = step 600 (white text must reach ≥ 4.5:1; if not, use 700)
-   - `primary-hover` = 700
-   - `primary-subtle` = 50–100
-   - `text` = neutral 900
-   - `text-muted` = neutral 600
-   - `border` = neutral 200
-   - `surface-subtle` = neutral 50
-5. **Status colors are fixed and do not follow the brand hue:**
-   - success = green-700 `#15803D`
-   - warning = amber-700 `#B45309`
-   - danger = red-600 `#DC2626`
-   - info = blue-600 `#2563EB`
-   - Use their 50-step tints as pill backgrounds.
-6. **Proportion:** about 60% neutral surfaces, 30% secondary surfaces and text, ≤10% primary/accent. The primary color marks *actions*; if everything is blue, nothing is clickable.
-7. **Verify every text/background pair** against `design-foundations.md` §3 before building.
-
-**Ready-made primaries** (white text passes 4.5:1):
-- blue `#2563EB`
-- indigo `#4F46E5`
-- teal `#0F766E`
-- turquoise-dark `#0E7490`
-- green `#15803D`
-- terracotta `#C2410C`
-- navy `#1E3A8A`
+Then verify pages with `scripts/audit.mjs … --contrast` (§ step 6 of SKILL.md).
 
 ## 3. Dark mode
 - Background is never pure `#000`: use ≈ `oklch(0.17–0.20 0.01–0.02 H)` (e.g. `#0B0F17`).

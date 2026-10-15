@@ -3,7 +3,7 @@
 **When:** after building any page or component, before telling the user it's done.
 
 **How:**
-1. Run the automated audit: `node <skill-dir>/scripts/audit.mjs <files-or-folder> [--iran]`. Items marked **[auto]** below are checked by it.
+1. Run the automated audit: `node <skill-dir>/scripts/audit.mjs <files-or-folder> [--iran] --contrast --css <css-folder>`. Items marked **[auto]** below are checked by it. `--contrast` checks every text element against its background in light and dark mode; anything it lists under "could not resolve" (dynamic classes, components, background images, unknown colors) is **not** passed — check those in the browser.
 2. Check the remaining items by reading your code and, if a browser or preview tool is available, by viewing the page at **375px and 1440px** (plus 320px for overflow).
 3. **Fix every failed item** — don't just list it — then re-run the audit.
 4. Report with the template at the end.
@@ -29,7 +29,8 @@ Only check the sections that apply: A always; B for English/LTR; C for any Persi
 - [ ] Forms: visible labels, ≤ 8 visible fields, validation on blur, specific error text, input kept on error, correct `type`/`inputmode`/`autocomplete`.
 
 **Accessibility**
-- [ ] Contrast: text ≥ 4.5:1 (large ≥ 3:1), UI borders and icons ≥ 3:1; no gray-400-on-white text.
+- [ ] Contrast: text ≥ 4.5:1 (large ≥ 3:1), UI borders and icons ≥ 3:1; no gray-400-on-white text. **[auto with --contrast]**; unresolved items checked by eye. Persian text under 14px ≥ 5.5:1 is a house rule (warning).
+- [ ] Colors come from the brand-color-system palette (exact brand color kept, links use `text-primary-ink`, labels on primary use `text-primary-fg`, never `text-white`).
 - [ ] `<html lang>` set **[auto]**; one `<h1>`, no skipped heading levels; landmarks; skip link.
 - [ ] Focus ring visible everywhere; no `outline-none` without a replacement **[auto]**; sticky header doesn't cover focused content.
 - [ ] Icon-only buttons have `aria-label` **[auto]**; inputs have labels **[auto]**; images have `alt` (decorative `alt=""`) **[auto]**.
@@ -91,6 +92,7 @@ Audit: <N errors → 0>, <N warnings → M remaining (why acceptable)>
 Fixed:
 - <what was wrong> → <what I changed> (<file:line>)
 - …
+Contrast (--contrast): <n> text checks · <n> pass · <n> fixed · <n> could not resolve → checked by eye: <list>
 Checked manually: <viewports / keyboard / contrast / dark mode>
 Needs your input: <real logos, eNamad ID, prices, photos, legal text…>
 Verify before launch (time-sensitive): <providers, prices, regulations used>

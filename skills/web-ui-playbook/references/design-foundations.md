@@ -59,7 +59,9 @@ Sources: reports A (general UI/UX) and B (modern web design), plus general pract
 **Contrast minimums (WCAG 2.2 AA):**
 - Normal text: **≥ 4.5:1**. Large text (≥24px, or ≥18.66px bold): **≥ 3:1**.
 - UI boundaries (input borders, icons, focus rings) against their neighbors: **≥ 3:1**.
-- Aim for ≥ 7:1 on body text when it costs nothing. Persian microcopy under 14px: ≥ 5.5:1.
+- Aim for ≥ 7:1 on body text when it costs nothing.
+- Persian microcopy under 14px: ≥ 5.5:1 — a **house rule** of this skill for dot legibility, not a WCAG requirement (`brand-color-system` → `persian-iran-color.md` §2).
+- Don't compute ratios by eye: `brand-color-system/scripts/check-contrast.mjs --pair "#fg on #bg"` for one pair, `audit.mjs --contrast` for whole pages.
 - Placeholder text is still text. Keep it ≥ 4.5:1, or make sure it isn't the only label.
 
 **Known-safe pairs on white (computed, approximate):**
@@ -72,13 +74,13 @@ Sources: reports A (general UI/UX) and B (modern web design), plus general pract
 | `#9CA3AF` gray-400 | 2.5:1 ✗ | disabled or decorative only, never readable text |
 | `#2563EB` blue-600 | 5.2:1 | links; white text on it passes |
 | `#3B82F6` blue-500 | 3.7:1 ✗ small text | large text or icons only |
-| `#DC2626` red-600 | 4.8:1 | error text |
+| `#DC2626` red-600 | 4.8:1 | error text on white only — on a red-50 tint it drops to 4.35:1; use red-700 there |
 | `#15803D` green-700 | 5.0:1 | success text (green-600 `#16A34A` is only 3.3:1 ✗) |
 | `#B45309` amber-700 | 5.0:1 | warning text (amber-500 fails) |
 
 - Never use color alone to show status: add an icon or text ("Paid", a red border **plus** an error message).
 - Define new colors in `oklch()` (perceptually even lightness, so light/dark ramps behave predictably) `[Proven]`. Hex is acceptable in primitives.
-- Palette recipe and dark mode: see `visual-direction.md` §2–3.
+- Palette and dark mode: generate them with the **brand-color-system** skill (`visual-direction.md` §2 summarizes it); dark-mode rules in `visual-direction.md` §3.
 
 ## 4. Radius, borders, shadows
 **Radius scale:** `sm` 6px (badges, small inputs), `md` 8–10px (buttons, inputs), `lg` 12–16px (cards, modals), `full` (pills, avatars). Pick one personality per project (sharp 4–6 / standard 8–12 / soft 12–20) and keep it.
