@@ -327,6 +327,27 @@ function cssBlocks(css) {
 }
 const toPx = (v) => { const m = String(v).match(/(-?[\d.]+)(px|rem|em)/); return m ? (m[2] === 'px' ? +m[1] : +m[1] * 16) : NaN; };
 
+/** CSS files in cascade order: each entry file's relative @import chain first, like the browser/Tailwind (later wins). */
+function cssInImportOrder(files) {
+  const cache = new Map();
+  const importsOf = (f) => {
+    if (!cache.has(f)) {
+      const src = fs.readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+      cache.set(f, [...src.matchAll(/@import\s+(?:url\(\s*)?["']([^"']+)["']/g)].map((m) => m[1])
+        .filter((s) => !s.startsWith('@') && !/^[a-z]+:/i.test(s) && (/^\.{1,2}\//.test(s) || /\.css$/i.test(s)))
+        .map((s) => path.resolve(path.dirname(f), s)).filter((p) => fs.existsSync(p)));
+    }
+    return cache.get(f);
+  };
+  const all = [...new Set(files.map((f) => path.resolve(f)))];
+  const imported = new Set(all.flatMap(importsOf));
+  const out = [], seen = new Set();
+  const visit = (f) => { if (seen.has(f)) return; seen.add(f); for (const i of importsOf(f)) visit(i); out.push(f); };
+  for (const f of all) if (!imported.has(f)) visit(f);
+  for (const f of all) visit(f);
+  return out;
+}
+
 /** Tokens from CSS files: light (:root, html, @theme) and dark (.dark, [data-theme=dark], prefers-color-scheme: dark). */
 function loadTheme(cssFiles) {
   const vars = { light: {}, dark: {} };
@@ -571,8 +592,9 @@ function contrastFile(file, R, layoutBody) {
 function runContrast(files) {
   let cssFiles = [...files.filter((f) => /\.css$/i.test(f)), ...cssArgs.flatMap((p) => (fs.existsSync(p) ? walk(p).filter((f) => /\.css$/i.test(f)) : []))];
   if (!cssFiles.length) for (const d of ['resources/css', 'src']) if (fs.existsSync(d)) cssFiles.push(...walk(d).filter((f) => /\.css$/i.test(f)));
-  cssFiles = [...new Set(cssFiles)];
+  cssFiles = cssInImportOrder(cssFiles);
   const R = loadTheme(cssFiles);
+  cssFiles = cssFiles.map((f) => path.relative(process.cwd(), f) || f);
   const pages = files.filter((f) => !/\.css$/i.test(f));
   let layoutBody = null;
   for (const f of pages) {
