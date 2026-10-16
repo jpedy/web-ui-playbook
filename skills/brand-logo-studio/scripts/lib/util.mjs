@@ -25,6 +25,55 @@ export function contrast(a, b) {
 }
 export const ratio = (a, b) => (Math.floor(contrast(a, b) * 100) / 100).toFixed(2);
 
+// OKLab/OKLCH (Ottosson) — only what is needed to shift a color's lightness at a fixed hue.
+const toLin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const toGam = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+export function hexToOklch(hex) {
+  const [r, g, b] = hexToRgb(hex).map(toLin);
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b), m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b), s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  const L = 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, A = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, B = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
+  return { l: L, c: Math.hypot(A, B), h: (Math.atan2(B, A) * 180) / Math.PI };
+}
+function oklchToRgb({ l: L, c, h }) {
+  const A = c * Math.cos((h * Math.PI) / 180), B = c * Math.sin((h * Math.PI) / 180);
+  const l = (L + 0.3963377774 * A + 0.2158037573 * B) ** 3, m = (L - 0.1055613458 * A - 0.0638541728 * B) ** 3, s = (L - 0.0894841775 * A - 1.291485548 * B) ** 3;
+  return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s, -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s];
+}
+/** OKLCH → hex, reducing chroma until the color fits in sRGB (hue and lightness kept). */
+export function oklchToHex(o) {
+  const inGamut = (rgb) => rgb.every((v) => v >= -1e-4 && v <= 1 + 1e-4);
+  let lo = 0, hi = o.c, rgb = oklchToRgb(o);
+  if (!inGamut(rgb)) { for (let i = 0; i < 24; i++) { const mid = (lo + hi) / 2; if (inGamut(oklchToRgb({ ...o, c: mid }))) lo = mid; else hi = mid; } rgb = oklchToRgb({ ...o, c: lo }); }
+  return '#' + rgb.map((v) => Math.round(toGam(Math.min(1, Math.max(0, v))) * 255).toString(16).padStart(2, '0')).join('');
+}
+/**
+ * The color closest to `hex` (same hue) that reaches `target` contrast against `against`.
+ * Tries the palette scale stops first (keeps the kit on-palette), then shifts OKLCH lightness.
+ * Returns { hex, ratio, from: 'as-is' | 'scale <stop>' | 'lightness', ok }.
+ */
+export function toContrast(hex, against, target = 3, scale = null) {
+  if (contrast(hex, against) >= target) return { hex, ratio: contrast(hex, against), from: 'as-is', ok: true };
+  const base = hexToOklch(hex), darker = hexToOklch(against).l > base.l; // a light background needs a darker color
+  let shift = { hex, ratio: contrast(hex, against), from: 'lightness', ok: false };
+  for (let i = 1; i <= 100; i++) {
+    const l = darker ? base.l - i * 0.01 : base.l + i * 0.01;
+    if (l <= 0 || l >= 1) break;
+    const h = oklchToHex({ ...base, l });
+    shift = { hex: h, ratio: contrast(h, against), from: 'lightness', ok: contrast(h, against) >= target };
+    if (shift.ok) break;
+  }
+  // A palette stop wins only when it is about as close to the original as the minimal shift (ΔL ≤ 0.06):
+  // staying on-palette is nice, jumping from gold to brown is not.
+  if (scale && shift.ok) {
+    const cands = Object.entries(scale).filter(([, h]) => contrast(h, against) >= target && Math.abs(hexToOklch(h).l - hexToOklch(shift.hex).l) <= 0.06);
+    if (cands.length) {
+      cands.sort((a, b) => Math.abs(hexToOklch(a[1]).l - base.l) - Math.abs(hexToOklch(b[1]).l - base.l));
+      return { hex: cands[0][1], ratio: contrast(cands[0][1], against), from: `scale ${cands[0][0]}`, ok: true };
+    }
+  }
+  return shift;
+}
+
 // ---------- PNG decode (8-bit RGB/RGBA/gray, non-interlaced — Chrome screenshots and resvg output) ----------
 export function decodePng(buf) {
   if (buf.readUInt32BE(0) !== 0x89504e47) throw new Error('not a PNG');
@@ -58,6 +107,17 @@ export function decodePng(buf) {
     prev = line;
   }
   return { width, height, pixels: out };
+}
+
+// ---------- PNG encode (8-bit RGBA, filter 0) — for diagnostic images ----------
+const CRC = new Int32Array(256).map((_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c; });
+const crc32 = (buf) => { let c = -1; for (const b of buf) c = CRC[(c ^ b) & 255] ^ (c >>> 8); return (c ^ -1) >>> 0; };
+export function encodePng(width, height, rgba) {
+  const chunk = (type, data) => { const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const td = Buffer.concat([Buffer.from(type, 'ascii'), data]); const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(td)); return Buffer.concat([len, td, crc]); };
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(width, 0); ihdr.writeUInt32BE(height, 4); ihdr[8] = 8; ihdr[9] = 6;
+  const raw = Buffer.alloc((width * 4 + 1) * height);
+  for (let y = 0; y < height; y++) Buffer.from(rgba.buffer, rgba.byteOffset + y * width * 4, width * 4).copy(raw, y * (width * 4 + 1) + 1);
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 }
 
 // ---------- ICO (BMP/DIB entries: decoded by every browser and by Windows' own icon loader) ----------

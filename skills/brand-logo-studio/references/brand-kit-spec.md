@@ -24,7 +24,7 @@
 | `fonts` | no | font specs (fonts.md) or paths to licensed TTFs; `letter` must be static |
 | `tracking` | no | em, Latin only (e.g. 0.05 for an all-caps name) |
 
-Logo colors are derived and checked automatically: icon shapes ≥ 3:1 on the light background, wordmark ink ≥ 4.5:1 on light and dark; a faint brand color is replaced by a darker brand shade *for the logo only* (the exact brand color stays in the palette); the accent keeps its own color on dark when it reads there. Every substitution is reported.
+Logo colors are derived and checked automatically: icon shapes ≥ 3:1 on the light background, wordmark ink ≥ 4.5:1 on light and dark; a faint brand color is replaced by a darker brand shade *for the logo only* (the exact brand color stays in the palette); the accent is adjusted per context so it reaches 3:1 against what it touches — `accentOnLight` (the wordmark dot on white), `accentOnPrimary` (a dot inside the brand-colored square), `accentOnPale` (a dot inside the light square on dark), `accentOnDark` — each the same hue, taken from the palette's accent scale when a stop is about as close as the minimal lightness shift, otherwise shifted in OKLCH lightness. The exact accent stays in the palette. Every substitution is reported.
 
 ## 2. Files the kit writes (`export-kit.mjs --out public/brand`)
 | File | Size | Notes |
@@ -40,7 +40,8 @@ Logo colors are derived and checked automatically: icon shapes ≥ 3:1 on the li
 | `png/favicon-16.png`, `png/favicon-32.png` | 16, 32 | |
 | `png/apple-touch-icon.png` | 180 | **opaque** (iOS shows transparency as black), icon at 140 |
 | `png/icon-192.png`, `png/icon-512.png` | 192, 512 | web manifest, transparent |
-| `png/icon-maskable-512.png` | 512 | opaque; art at 56% so it stays inside the 80% safe circle (checked: farthest ink ≤ 40% of the size from the center) |
+| `png/icon-maskable-512.png` | 512 | the brand color fills the icon and the mark is drawn in white (or the ink color) when that reaches 3:1 on it — container recipes drop their container, the field takes its place; otherwise the icon on the light background. Checked: farthest ink ≤ 40% of the size from the center |
+| `svg/favicon-monogram.svg` | vector | only when the chosen icon blurs at 16 px (more than half of its 16 px pixels only partly covered, e.g. the book or rings): the favicons then use this simplified monogram; kit-report.md says so |
 | `png/logo-light@2x.png`, `png/logo-dark@2x.png` | 1600 wide | light = transparent; dark = on the dark background |
 | `png/og-image.png` | 1200 × 630 | link previews (Telegram, WhatsApp, X, LinkedIn); content inside the central safe area |
 | `png/avatar-640.png` | 640 | Instagram, Telegram, WhatsApp, Eitaa, Bale — icon at 60%, survives a circular crop |

@@ -5,11 +5,11 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { lockup, iconBody, svgDoc, RECIPES } from './marks.mjs';
+import { lockup, iconBody, svgDoc, markOnField, RECIPES } from './marks.mjs';
 import { DECISION } from './brief.mjs';
 import { render } from './vendor.mjs';
 import { encodeIco, unpremultiply, contrast } from './util.mjs';
-import { validateSvg, inkRadius } from './validate.mjs';
+import { validateSvg, inkRadius, smallSizeScore } from './validate.mjs';
 import { shapeText } from './shape.mjs';
 import { transformPath } from './path.mjs';
 import { hasLatin } from './bidi.mjs';
@@ -103,12 +103,21 @@ export async function exportKit(brief, dirId, out) {
   await add('logo-icon-mono-black.svg', 'icon', 'mono-black');
   for (const m of masters) for (const f of await validateSvg(m.svg, { kind: m.mode === 'color' ? 'light' : m.mode, lightBg: c.lightBg, darkBg: c.darkBg })) if (f.level !== 'ok') findings.push({ file: `svg/${m.name}`, ...f });
 
-  // 2. favicon set
-  const fav = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><style>.d{display:none}@media (prefers-color-scheme:dark){.l{display:none}.d{display:inline}}</style><g class="l">${place(icon, 0, 0, 100, 100)}</g><g class="d">${place(iconRev, 0, 0, 100, 100)}</g></svg>`;
+  // 2. favicon set — a mark that is mostly thin strokes at 16 px is replaced by a simplified monogram there
+  const decisions = [];
+  let favIcon = icon, favIconRev = iconRev;
+  const small = await smallSizeScore(icon);
+  if (small.weak && dir.icon !== 'R1_monogram') {
+    const mono = async (m) => svgDoc('0 0 100 100', await iconBody('R1_monogram', c, m, { letter: brief.monogram, letterFont: brief.fonts.letter }));
+    favIcon = await mono('color'); favIconRev = await mono('reversed');
+    write(path.join(svgDir, 'favicon-monogram.svg'), favIcon);
+    decisions.push(`Favicons (favicon.svg, favicon.ico, favicon-16/32) use a simplified monogram («${brief.monogram}» in a rounded square, \`svg/favicon-monogram.svg\`) instead of the ${RECIPES[dir.icon].name.toLowerCase()}: at 16 px ${Math.round(small.partialShare * 100)}% of its pixels are only partly covered (limit 50%), so the symbol blurs. The larger icons keep the symbol.`);
+  }
+  const fav = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><style>.d{display:none}@media (prefers-color-scheme:dark){.l{display:none}.d{display:inline}}</style><g class="l">${place(favIcon, 0, 0, 100, 100)}</g><g class="d">${place(favIconRev, 0, 0, 100, 100)}</g></svg>`;
   write(path.join(out, 'favicon.svg'), fav);
   const icoImgs = [];
   for (const s of [16, 32, 48]) {
-    const r = await render(icon, { width: s, height: s });
+    const r = await render(favIcon, { width: s, height: s });
     icoImgs.push({ size: s, pixels: unpremultiply(r.pixels) });
     if (s !== 48) write(path.join(pngDir, `favicon-${s}.png`), r.png);
   }
@@ -116,9 +125,23 @@ export async function exportKit(brief, dirId, out) {
   write(path.join(pngDir, 'apple-touch-icon.png'), (await render(square(180, c.lightBg, icon, 140), { width: 180 })).png); // opaque: iOS fills transparency with black
   write(path.join(pngDir, 'icon-192.png'), (await render(square(192, null, icon, 192), { width: 192 })).png);
   write(path.join(pngDir, 'icon-512.png'), (await render(square(512, null, icon, 512), { width: 512 })).png);
-  const radius = await inkRadius(square(512, null, icon, 0.56 * 512));
+  // Maskable: the brand color fills the icon when a one-color mark reads on it (≥ 3:1); the mark stays inside the 80% circle.
+  const markInk = contrast('#ffffff', c.primary) >= 3 ? '#ffffff' : contrast(c.ink, c.primary) >= 3 ? c.ink : null;
+  let maskArt, maskField;
+  if (markInk) {
+    const acc = dir.accentDots !== 'none' && contrast(c.accentOnPrimary, c.primary) >= 3 ? c.accentOnPrimary : null;
+    const mark = svgDoc('0 0 100 100', await markOnField(dir.icon, markInk, acc, { letter: brief.monogram, letterFont: brief.fonts.letter, accentDot: !!acc }));
+    let size = 0.8 * 512;
+    while (size > 128 && (await inkRadius(square(512, null, mark, size))) > 0.36) size -= 16;
+    maskArt = square(512, null, mark, size); maskField = c.primary;
+    decisions.push(`Maskable app icon: the brand color ${c.primary} fills the whole icon; the mark is drawn in ${markInk} (${contrast(markInk, c.primary).toFixed(2)}:1)${acc ? ` with the dot in ${acc}` : ''}, inside the 80% safe circle.`);
+  } else {
+    maskArt = square(512, null, icon, 0.56 * 512); maskField = c.lightBg;
+    decisions.push(`Maskable app icon: neither white nor the ink color reaches 3:1 on the brand color ${c.primary}, so the icon sits on the light background.`);
+  }
+  const radius = await inkRadius(maskArt);
   if (radius > 0.4) findings.push({ file: 'png/icon-maskable-512.png', level: 'FAIL', id: 'maskable', msg: `art reaches ${Math.round(radius * 100)}% of the size from the center (safe zone is 40%)` });
-  write(path.join(pngDir, 'icon-maskable-512.png'), (await render(square(512, c.lightBg, icon, 0.56 * 512), { width: 512 })).png);
+  write(path.join(pngDir, 'icon-maskable-512.png'), (await render(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" fill="${maskField}"/>${inner(maskArt)}</svg>`, { width: 512 })).png);
 
   // 3. rasters for web, social and email
   write(path.join(pngDir, 'logo-light@2x.png'), (await render(primary, { width: 1600 })).png);
@@ -147,9 +170,9 @@ export async function exportKit(brief, dirId, out) {
   if (brief.name.fa) { proof = await proofSheet(brief.name.fa, brief.fonts.fa, path.join(proofDir, 'proof-wordmark.png')); files.push('proof/proof-wordmark.png'); }
   await brandSheet(brief, path.join(out, 'brand-sheet.png'), { primary, reversed, icon });
   files.push('brand-sheet.png');
-  const report = kitReport(brief, dir, [...files, 'kit-report.md'], findings, [...warnings], proof);
+  const report = kitReport(brief, dir, [...files, 'kit-report.md'], findings, [...warnings], proof, decisions);
   write(path.join(out, 'kit-report.md'), report);
-  return { files, findings, warnings: [...warnings], proof, dir };
+  return { files, findings, warnings: [...warnings], proof, dir, decisions };
 }
 
 async function brandSheet(brief, file, { primary, reversed, icon }) {
@@ -168,7 +191,7 @@ async function brandSheet(brief, file, { primary, reversed, icon }) {
   p.push(await label('Icon at 128, 64, 32, 16 px and in a round avatar', 20, 40, 470));
   p.push(`<rect x="640" y="420" width="640" height="380" fill="#ffffff"/>`);
   p.push(await label('Colors', 22, 680, 470));
-  const sw = [['brand (exact)', c.brandExact, c.lightBg], ['logo primary', c.primary, c.lightBg], ['ink', c.ink, c.lightBg], ['accent', c.accent, c.lightBg], ['on dark', c.onDark, c.darkBg], ['dark background', c.darkBg, c.onDark]];
+  const sw = [['brand (exact)', c.brandExact, c.lightBg], ['logo primary', c.primary, c.lightBg], ['ink', c.ink, c.lightBg], ['accent (logo, on light)', c.accentOnLight, c.lightBg], ['on dark', c.onDark, c.darkBg], ['dark background', c.darkBg, c.onDark]];
   for (let i = 0; i < sw.length; i++) {
     const [name, hex, against] = sw[i], sx = 680 + (i % 3) * 195, sy = 500 + Math.floor(i / 3) * 140;
     p.push(`<rect x="${sx}" y="${sy}" width="175" height="70" rx="8" fill="${hex}" stroke="#e5e7eb"/>`);
@@ -204,7 +227,7 @@ function group(findings) {
   return [...m.values()];
 }
 
-function kitReport(brief, dir, files, findings, warnings, proof) {
+function kitReport(brief, dir, files, findings, warnings, proof, decisions = []) {
   const c = brief.colors;
   const latin = hasLatin(`${brief.name.fa || ''} ${brief.name.en || ''}`);
   const blocking = findings.filter((f) => f.level === 'FAIL');
@@ -217,7 +240,10 @@ Generated ${new Date().toISOString().slice(0, 10)} by brand-logo-studio · direc
 - Open \`brand-sheet.png\`: the icon must still read at 16 px; the reversed logo must be clear on dark.
 - Automated checks: ${blocking.length ? `${blocking.length} blocking problem(s), listed under Validation` : 'no blocking problems'}. **Passing them does not prove the logo is good, original or free to register.** Search for similar marks before using it (references/legal-iran.md).
 
-## Files
+${decisions.length ? `## Decisions made automatically
+${decisions.map((d) => `- ${d}`).join('\n')}
+
+` : ''}## Files
 ${files.map((f) => `- \`${f}\``).join('\n')}
 
 Copy the folder to \`public/brand/\` in your Laravel project and paste \`head-snippet.blade.php\` into the \`<head>\` of your layout.
@@ -225,7 +251,7 @@ Copy the folder to \`public/brand/\` in your Laravel project and paste \`head-sn
 ## Colors
 | Role | Hex | On white | On dark (${c.darkBg}) |
 |---|---|---|---|
-${[['brand (exact)', c.brandExact], ['logo primary', c.primary], ['ink (wordmark)', c.ink], ['accent', c.accent], ['on dark', c.onDark], ['accent on dark', c.accentOnDark]].map(([n, h]) => `| ${n} | \`${h}\` | ${contrast(h, '#ffffff').toFixed(2)}:1 | ${contrast(h, c.darkBg).toFixed(2)}:1 |`).join('\n')}
+${[['brand (exact)', c.brandExact], ['logo primary', c.primary], ['ink (wordmark)', c.ink], ['accent (palette)', c.accent], ['accent on light (logo)', c.accentOnLight], ['accent inside brand color', c.accentOnPrimary], ['on dark', c.onDark], ['accent on dark', c.accentOnDark]].map(([n, h]) => `| ${n} | \`${h}\` | ${contrast(h, '#ffffff').toFixed(2)}:1 | ${contrast(h, c.darkBg).toFixed(2)}:1 |`).join('\n')}
 ${c.notes.length ? '\n' + c.notes.map((n) => `- ${n}`).join('\n') : ''}
 
 ## Fonts (outlined into the logo — the font files are not needed to display it)
@@ -235,8 +261,8 @@ ${c.notes.length ? '\n' + c.notes.map((n) => `- ${n}`).join('\n') : ''}
 ${findings.length ? group(findings).map(([f, list]) => `- ${f.level} · ${f.id}: ${f.msg}\n  in ${list.map((x) => `\`${x}\``).join(', ')}`).join('\n') : '- All masters: no live text, no external references, nothing clipped, contrast ≥ 3:1, survives one-color print.'}
 ${warnings.length ? '\n' + warnings.map((w) => `- note: ${w}`).join('\n') : ''}
 
-## Legal notes ⏱ (as of Oct 2026 — verify with an IP attorney; not legal advice)
-${latin ? '- The logo contains Latin letters. Iranian filing guides commonly state that a mark with Latin characters needs a commercial card (کارت بازرگانی). `svg/logo-fa-only.svg` is the Persian-only version for a domestic filing — confirm the rule with an IP attorney before you file.' : '- The logo is Persian-only.'}
-- Search the Iranian trademark database and the official gazette before use (steps in references/legal-iran.md).
+## Legal notes ⏱ (as of 2026-10-16 — not legal advice)
+${latin ? '- The logo contains Latin letters. According to the research this skill is based on (1404–1405 / 2025–2026), registering a mark with Latin letters in Iran requires a commercial card (کارت بازرگانی). `svg/logo-fa-only.svg` is the Persian-only version for a domestic filing. **Verify with an IP attorney** before filing — this rule was not independently confirmed.' : '- The logo is Persian-only.'}
+- Search the Iranian trademark database and the official gazette before use (steps in references/legal-iran.md); verify with an IP attorney before relying on the result.
 `;
 }

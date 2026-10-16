@@ -96,7 +96,7 @@ check((await ids('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><i
 check((await ids('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><use href="https://x.test/a.svg#i"/></svg>')).includes('external'), 'catches an external reference');
 check((await ids('<svg xmlns="http://www.w3.org/2000/svg"><rect width="5" height="5"/></svg>')).includes('viewbox'), 'catches a missing viewBox');
 check((await ids('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect x="-4" width="8" height="8" fill="#111111"/></svg>')).includes('clipping'), 'catches ink outside the viewBox');
-check((await ids('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="#fde68a"/></svg>')).includes('contrast'), 'warns on a faint logo color');
+check((await ids('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect x="2" y="2" width="6" height="6" fill="#fde68a"/></svg>')).includes('contrast'), 'warns on a faint logo color');
 const colorOnly = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="10" y="10" width="80" height="80" fill="#0d9488"/><rect x="30" y="30" width="40" height="40" fill="#111827"/></svg>';
 const cutout = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path fill-rule="evenodd" fill="#0d9488" d="M10 10H90V90H10Z M30 30H70V70H30Z"/></svg>';
 check((await ids(colorOnly)).includes('one-color'), 'warns when detail is separated by color only');
@@ -145,6 +145,18 @@ check(kitIco.readUInt16LE(4) === 3 && [16, 32, 48].every((s, i) => kitIco[6 + 16
 check(kit.proof.checks.every((c) => c.ok), 'proof sheet: every dot of زبان‌سرا found');
 check(fs.readFileSync(path.join(tmp, 'kit-report.md'), 'utf8').includes('کارت بازرگانی'), 'report carries the Latin-letters filing note');
 fs.rmSync(tmp, { recursive: true, force: true });
+// accent roles, 16 px favicon fallback, brand-colored maskable field
+for (const [k, against] of [['accentOnLight', fx.colors.lightBg], ['accentOnPrimary', fx.colors.primary], ['accentOnPale', fx.colors.onDark]]) check(contrast(fx.colors[k], against) >= 3, `${k} ${fx.colors[k]} reaches 3:1 (${contrast(fx.colors[k], against).toFixed(2)})`);
+check(fx.colors.accent === '#d9b863', 'the palette accent itself is never changed');
+const tmpB = fs.mkdtempSync(path.join(os.tmpdir(), 'bls-kitB-'));
+const kitB = await exportKit(fx, 'B', tmpB);
+check(kitB.decisions.some((d) => d.includes('simplified monogram')) && fs.existsSync(path.join(tmpB, 'svg/favicon-monogram.svg')), 'direction B (book, thin at 16 px) → monogram favicon, stated in the report');
+check(fs.readFileSync(path.join(tmpB, 'kit-report.md'), 'utf8').includes('simplified monogram'), 'kit-report.md names the favicon substitution');
+check(!kit.decisions.some((d) => d.includes('simplified monogram')), 'direction C (monogram) keeps its own favicon');
+const mask = decodePng(fs.readFileSync(path.join(tmpB, 'png/icon-maskable-512.png')));
+check(mask.pixels[0] === 0x0d && mask.pixels[1] === 0x94 && mask.pixels[2] === 0x88, 'maskable icon: brand-colored field (corner pixel is the brand color)');
+check(fs.readFileSync(path.join(tmpB, 'kit-report.md'), 'utf8').includes('Verify with an IP attorney'), 'legal note says "verify with an IP attorney"');
+fs.rmSync(tmpB, { recursive: true, force: true });
 
 // 7. browser comparison
 const chrome = findChrome();
@@ -152,6 +164,15 @@ if (chrome) {
   for (const [t, f] of [['زبان‌سرا', 'vazirmatn-black'], ['کلاس IELTS ۱۲۳', 'vazirmatn-bold'], ['Zabansara', 'plus-jakarta-sans:800'], ['شیرینی‌پزی', 'estedad:800']]) {
     const r = await compareWithChrome(t, f, 120);
     check(r.status === 'pass', `matches ${path.basename(chrome)}: «${t}» ${f} → ${r.status} ${r.score ? (r.score * 100).toFixed(1) + '%' : r.reason}`);
+  }
+  // negative cases: the browser draws a deliberately different string — the rule must catch it
+  const noDot = await compareWithChrome('ریز', 'vazirmatn-black', 120, { browserText: 'ریر' });
+  check(noDot.status === 'differs', `catches a missing dot (ریز vs ریر): ${noDot.status}, shapes ${noDot.analysis?.shapesOurs}/${noDot.analysis?.shapesBrowser}, overlap ${(noDot.score * 100).toFixed(1)}%`);
+  const join = await compareWithChrome('زبان‌سرا', 'vazirmatn-black', 120, { browserText: 'زبانسرا' });
+  check(join.status === 'differs', `catches a wrong join (ZWNJ dropped): ${join.status}, shapes ${join.analysis?.shapesOurs}/${join.analysis?.shapesBrowser}, overlap ${(join.score * 100).toFixed(1)}%`);
+  for (const [t, f] of [['زبان‌سرا', 'vazirmatn-black'], ['پیشگام', 'vazirmatn-black']]) {
+    const r = await compareWithChrome(t, f, 120);
+    check(r.analysis.edgeShare > 0.95 && r.analysis.largestInteriorBlob === 0, `«${t}»: the mismatch is edge anti-aliasing only (${(r.analysis.edgeShare * 100).toFixed(0)}% within 2 px of an edge)`);
   }
 } else console.log('(no Chrome/Edge found: browser comparison not run)');
 const saved = process.env.CHROME_PATH;

@@ -28,6 +28,7 @@ const grouped = new Map();
 for (const f of res.findings) { const key = `${f.level}|${f.id}|${f.msg}`; grouped.set(key, [...(grouped.get(key) || []), f.file]); }
 for (const [key, list] of grouped) { const [level, id, msg] = key.split('|'); console.log(`${level.padEnd(5)}  ${id}: ${msg}
        in ${list.join(', ')}`); }
+for (const d of res.decisions) console.log(`auto   ${d}`);
 for (const w of res.warnings) console.log(`note   ${w}`);
 console.log('Read kit-report.md, then open proof/proof-wordmark.png and brand-sheet.png — the final check is by eye.');
 process.exit(res.findings.some((f) => f.level === 'FAIL') ? 1 : 0);

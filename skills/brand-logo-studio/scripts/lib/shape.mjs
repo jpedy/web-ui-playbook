@@ -37,7 +37,7 @@ export async function shapeText(text, spec, { size = 100, base = 'auto', trackin
   let t = text;
   if (normalize) { const n = normalizePersian(text); t = n.text; warnings.push(...n.changes); }
   const s = size / upem;
-  const { runs } = bidiRuns(t, base);
+  const { runs, base: baseDir } = bidiRuns(t, base);
   const glyphs = [];
   const missing = new Set();
   for (const ch of t) { const c = ch.codePointAt(0); if (!unicodes.has(c) && c !== 0x20 && c !== 0x200c && c !== 0x200d) missing.add(ch); }
@@ -73,6 +73,6 @@ export async function shapeText(text, spec, { size = 100, base = 'auto', trackin
     text: t, d: glyphs.map((g) => g.d).join(''), glyphs, width: x * s,
     ascender: ext.ascender * s, descender: ext.descender * s,
     xHeight: metric(hb.MetricsTag.X_HEIGHT, size * 0.5), capHeight: metric(hb.MetricsTag.CAP_HEIGHT, size * 0.7),
-    bbox, runs, missing: [...missing], warnings, font: info.id,
+    bbox, runs, base: baseDir, missing: [...missing], warnings, font: info.id,
   };
 }

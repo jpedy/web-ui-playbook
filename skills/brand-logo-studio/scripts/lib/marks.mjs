@@ -7,6 +7,7 @@
 import { shapeText } from './shape.mjs';
 import { transformPath, findDots, subpaths, pathBBox } from './path.mjs';
 import { fontInfo } from './fonts.mjs';
+import { lettersInContext, expectedMarks, letterDots } from './letters.mjs';
 
 const r2 = (n) => Math.round(n * 100) / 100;
 const rrect = (x, y, w, h, r) => `M${x + r} ${y}H${x + w - r}A${r} ${r} 0 0 1 ${x + w} ${y + r}V${y + h - r}A${r} ${r} 0 0 1 ${x + w - r} ${y + h}H${x + r}A${r} ${r} 0 0 1 ${x} ${y + h - r}V${y + r}A${r} ${r} 0 0 1 ${x + r} ${y}Z`;
@@ -60,7 +61,12 @@ export const RECIPES = {
       const g = await glyphIn(o.letter, o.letterFont, { cx: 50, cy: 52, w: 50, h: 52 });
       // accentDot: the letter's dot stays a real cutout (one-color print keeps the gap); color modes fill it with the accent
       const subs = subpaths(g), dots = o.accentDot && !m.startsWith('mono') ? findDots(g).map((i) => subs[i]).join('') : '';
-      return `<path fill-rule="evenodd" fill="${paint(m, c, 'primary', 'onDark')}" d="${rrect(10, 10, 80, 80, 22)} ${g}"/>${dots ? `<path fill="${paint(m, c, 'accent', 'accentOnDark')}" d="${dots}"/>` : ''}`;
+      return `<path fill-rule="evenodd" fill="${paint(m, c, 'primary', 'onDark')}" d="${rrect(10, 10, 80, 80, 22)} ${g}"/>${dots ? `<path fill="${paint(m, c, 'accentOnPrimary', 'accentOnPale')}" d="${dots}"/>` : ''}`;
+    },
+    inner: async (fill, accent, o) => {
+      const g = await glyphIn(o.letter, o.letterFont, { cx: 50, cy: 52, w: 50, h: 52 });
+      const subs = subpaths(g), di = new Set(o.accentDot && accent ? findDots(g) : []);
+      return `<path fill-rule="evenodd" fill="${fill}" d="${subs.filter((_, i) => !di.has(i)).join('')}"/>${di.size ? `<path fill="${accent}" d="${subs.filter((_, i) => di.has(i)).join('')}"/>` : ''}`;
     } },
   R2_rings: { name: 'Two linked rings', kind: 'symbol', use: 'partnership, payments, connection; two parties',
     make: async (c, m) => `<defs><mask id="cut-${m}"><rect width="100" height="100" fill="#fff"/><circle cx="50" cy="29.5" r="6.5" fill="#000"/></mask><mask id="cut2-${m}"><rect width="100" height="100" fill="#fff"/><circle cx="50" cy="70.5" r="6.5" fill="#000"/></mask></defs>` +
@@ -69,15 +75,17 @@ export const RECIPES = {
   R3_book_bubble: { name: 'Open book + speech bubble', kind: 'symbol', use: 'language schools, tutoring, reading — "learn to speak"',
     make: async (c, m) => `<g fill="none" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"><path stroke="${paint(m, c, 'ink', 'onDark')}" d="M50 34C40 27 26 27 16 31V68C25 65 33 65 39 67L29 80L45 71C47 72 49 73 50 74"/><path stroke="${paint(m, c, 'primary', 'accentOnDark')}" d="M50 34C60 27 74 27 84 31V68C74 64 60 64 50 74"/><path stroke="${paint(m, c, 'ink', 'onDark')}" d="M50 34V74"/></g>` },
   R4_shield: { name: 'Shield with a check', kind: 'container', use: 'security, insurance, clinics, verification',
-    make: async (c, m) => `<path fill-rule="evenodd" fill="${paint(m, c, 'primary', 'onDark')}" d="M50 10L84 21V47C84 68 70 81 50 90C30 81 16 68 16 47V21Z ${thickLine([[34, 50], [45, 61], [67, 39]], 9)}"/>` },
+    make: async (c, m) => `<path fill-rule="evenodd" fill="${paint(m, c, 'primary', 'onDark')}" d="M50 10L84 21V47C84 68 70 81 50 90C30 81 16 68 16 47V21Z ${thickLine([[34, 50], [45, 61], [67, 39]], 9)}"/>`,
+    inner: async (fill) => `<path fill="${fill}" d="${thickLine([[34, 50], [45, 61], [67, 39]], 9)}"/>` },
   R5_taaq_arch: { name: 'Pointed arch (taaq) cut from a square', kind: 'container', use: 'architecture, hospitality, culture — only when the subject is related',
-    make: async (c, m) => `<path fill-rule="evenodd" fill="${paint(m, c, 'primary', 'onDark')}" d="${rrect(12, 12, 76, 76, 18)} M34 80V54C34 40 44 31 50 22C56 31 66 40 66 54V80Z"/>` },
+    make: async (c, m) => `<path fill-rule="evenodd" fill="${paint(m, c, 'primary', 'onDark')}" d="${rrect(12, 12, 76, 76, 18)} M34 80V54C34 40 44 31 50 22C56 31 66 40 66 54V80Z"/>`,
+    inner: async (fill) => `<path fill="${fill}" d="M34 80V54C34 40 44 31 50 22C56 31 66 40 66 54V80Z"/>` },
   R6_arrow: { name: 'Arrow cut from a circle', kind: 'symbol', use: 'logistics, growth, fintech, "go"',
     make: async (c, m) => `<path fill-rule="evenodd" fill="${paint(m, c, 'primary', 'onDark')}" d="M50 10C72.09 10 90 27.91 90 50C90 72.09 72.09 90 50 90C27.91 90 10 72.09 10 50C10 27.91 27.91 10 50 10ZM36 34H66V64H58V47.66L37.83 67.83L32.17 62.17L52.34 42H36V34Z"/>` },
   R7_cube: { name: 'Isometric cube', kind: 'symbol', use: 'software, building blocks, storage, logistics',
-    make: async (c, m) => `<polygon points="50,10 82,28.5 50,47 18,28.5" fill="${paint(m, c, 'accent', 'onDark')}"/><polygon points="16,35 47,53 47,90 16,72" fill="${paint(m, c, 'primary', 'accentOnDark')}"/><polygon points="84,35 84,72 53,90 53,53" fill="${paint(m, c, 'ink', 'onDarkMuted')}"/>` },
+    make: async (c, m) => `<polygon points="50,10 82,28.5 50,47 18,28.5" fill="${paint(m, c, 'accentOnLight', 'onDark')}"/><polygon points="16,35 47,53 47,90 16,72" fill="${paint(m, c, 'primary', 'accentOnDark')}"/><polygon points="84,35 84,72 53,90 53,53" fill="${paint(m, c, 'ink', 'onDarkMuted')}"/>` },
   R8_shamsa: { name: 'Eight-point star (shamsa)', kind: 'symbol', use: 'crafts, heritage, hospitality — only when the subject is related, never as a generic "Iranian" sign',
-    make: async (c, m) => `<path fill-rule="evenodd" fill="${paint(m, c, 'primary', 'onDark')}" d="${star8(50, 50, 40)} ${circle(50, 50, 15, true)}"/><circle cx="50" cy="50" r="7.5" fill="${paint(m, c, 'accent', 'accentOnDark')}"/>` },
+    make: async (c, m) => `<path fill-rule="evenodd" fill="${paint(m, c, 'primary', 'onDark')}" d="${star8(50, 50, 40)} ${circle(50, 50, 15, true)}"/><circle cx="50" cy="50" r="7.5" fill="${paint(m, c, 'accentOnLight', 'accentOnDark')}"/>` },
 };
 
 /** Icon SVG body for a recipe and mode. opts: { letter, letterFont } for R1. */
@@ -88,6 +96,17 @@ export async function iconBody(id, colors, mode, opts = {}) {
   return r.make(colors, mode, { ...opts, letterFont: opts.letterFont || 'vazirmatn-black' });
 }
 
+/**
+ * The mark for a full-bleed colored field (maskable app icon): a container recipe drops its container
+ * (the field takes its place) and keeps the cut-out shape; a symbol is drawn in one color.
+ */
+export async function markOnField(id, fill, accent, opts = {}) {
+  const r = RECIPES[id];
+  if (r.inner) return r.inner(fill, accent, { ...opts, letterFont: opts.letterFont || 'vazirmatn-black' });
+  const mode = fill.toLowerCase() === '#ffffff' ? 'mono-white' : 'mono-black';
+  return (await r.make({}, mode, { ...opts, letterFont: opts.letterFont || 'vazirmatn-black' })).replace(/(fill|stroke)="#(?:ffffff|000000)"/g, `$1="${fill}"`);
+}
+
 export const svgDoc = (vb, body, { title } = {}) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}">${title ? `<title>${title.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</title>` : ''}${body}</svg>`;
 
@@ -95,15 +114,11 @@ export const svgDoc = (vb, body, { title } = {}) =>
 async function wordmark(text, font, size, opts = {}) {
   const w = await shapeText(text, font, { size, base: opts.base || 'auto', tracking: opts.tracking || 0 });
   if (!opts.accentDots || opts.accentDots === 'none') return { ...w, bodyD: w.d, dotsD: '' };
-  const subs = subpaths(w.d);
-  const idx = findDots(w.d);
-  let chosen = idx;
-  if (opts.accentDots === 'first') { // the dot(s) of the first letter in reading order (right-most cluster in RTL)
-    const withX = idx.map((i) => ({ i, x: pathBBox(subs[i]).x0 }));
-    const maxX = Math.max(...withX.map((d) => d.x));
-    chosen = withX.filter((d) => d.x >= maxX - size * 0.18).map((d) => d.i);
-  }
-  const set = new Set(chosen);
+  // Real dots only, letter by letter (never گ's second stroke): 'first' = the first dotted letter in reading order.
+  const dotted = lettersInContext(w).filter((c) => !c.zwnj && c.seg.some((ch, j) => (expectedMarks(ch, j < c.seg.length - 1 || c.joinsNext)?.dots || 0) > 0) && letterDots(c.d).length);
+  const picked = opts.accentDots === 'first' ? dotted.slice(0, 1) : dotted;
+  const dotStrings = new Set(picked.flatMap((c) => { const sp = subpaths(c.d); return letterDots(c.d).map((i) => sp[i]); }));
+  const subs = subpaths(w.d), set = new Set(subs.map((p, i) => (dotStrings.has(p) ? i : -1)).filter((i) => i >= 0));
   return { ...w, bodyD: subs.filter((_, i) => !set.has(i)).join(''), dotsD: subs.filter((_, i) => set.has(i)).join('') };
 }
 
@@ -118,7 +133,7 @@ export async function lockup(o) {
   const { layout, colors: c, mode } = o;
   const warnings = [];
   const ink = paint(mode, c, 'ink', 'onDark');
-  const dotPaint = paint(mode, c, 'accent', 'accentOnDark');
+  const dotPaint = paint(mode, c, 'accentOnLight', 'accentOnDark');
   const P = 112, L = 100; // Persian set at 1.12 × Latin — a starting value; check visually (bilingual-lockups.md §2)
   const parts = [];
   const needFa = ['h-rtl', 'h-ltr', 'stacked', 'fa-only', 'wordmark-fa'].includes(layout);

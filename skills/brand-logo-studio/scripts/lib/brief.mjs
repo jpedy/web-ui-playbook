@@ -6,7 +6,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { contrast } from './util.mjs';
+import { contrast, toContrast } from './util.mjs';
 import { RECIPES } from './marks.mjs';
 import { normalizePersian } from './bidi.mjs';
 
@@ -86,7 +86,17 @@ export function logoColors(raw, dir = '.') {
   if (contrast(c.ink, lightBg) < 4.5) { notes.push(`Wordmark ink ${c.ink} is below 4.5:1 on white; using #111827.`); c.ink = '#111827'; }
   if (contrast(c.onDark, darkBg) < 4.5) { notes.push(`Reversed wordmark ${c.onDark} is below 4.5:1 on ${darkBg}; using #ffffff.`); c.onDark = '#ffffff'; }
   for (const k of ['accentOnDark', 'onDarkMuted']) if (contrast(c[k], darkBg) < 3) { notes.push(`${k} ${c[k]} is below 3:1 on ${darkBg}; using ${c.onDark}.`); c[k] = c.onDark; }
-  if (contrast(c.accent, lightBg) < 3) notes.push(`The accent ${c.accent} is ${contrast(c.accent, lightBg).toFixed(2)}:1 on white — fine for a dot or a small detail beside darker shapes, never as the only shape.`);
+  // The accent in context: each role reaches 3:1 against what it actually sits on (same hue; palette stop first).
+  const accScale = pal?.scales?.accent || null;
+  const role = (key, against, where) => {
+    if (raw.colors?.[key]) return raw.colors[key];
+    const r = toContrast(c.accent, against, 3, accScale);
+    if (r.from !== 'as-is') notes.push(`The accent ${c.accent} is ${contrast(c.accent, against).toFixed(2)}:1 ${where}, so the logo uses ${r.hex} there (${r.ratio.toFixed(2)}:1, ${r.from === 'lightness' ? 'same hue, adjusted lightness' : `palette accent-${r.from.split(' ')[1]}`})${r.ok ? '' : ' — the closest possible; 3:1 cannot be reached at this hue'}. The exact accent stays in the palette.`);
+    return r.hex;
+  };
+  c.accentOnLight = role('accentOnLight', lightBg, `on the light background ${lightBg}`);
+  c.accentOnPrimary = role('accentOnPrimary', c.primary, `inside the brand color ${c.primary}`);
+  c.accentOnPale = role('accentOnPale', c.onDark, `inside light shapes (${c.onDark}) on dark`);
   c.notes = notes;
   c.brandExact = pal?.brand?.hex || raw.colors?.primary;
   return c;

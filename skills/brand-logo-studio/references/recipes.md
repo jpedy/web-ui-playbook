@@ -7,8 +7,8 @@ Eight geometric icons on a 100 × 100 grid (`scripts/lib/marks.mjs`). Every sepa
 | Id | Shape | Use for | Limits |
 |---|---|---|---|
 | `R1_monogram` | First letter cut out of a rounded square; optional accent-colored dot | Any name; the safest app icon and avatar | Needs a **static** font for the letter (variable fonts overlap contours and break the cut-out) — `vazirmatn-black` by default. Letters without dots get no accent dot |
-| `R2_rings` | Two interlocked rings (two real cuts) | Partnership, payments, connection | Rings are common — make it yours with color and the wordmark |
-| `R3_book_bubble` | Open book whose left page ends in a speech-bubble tail | Language schools, tutoring, reading | Stroke-based: weakest at 16 px. For the favicon, direction A (monogram) reads better |
+| `R2_rings` | Two interlocked rings (two real cuts) | Partnership, payments, connection | Rings are common — make it yours with color and the wordmark. Thin at 16 px: favicons switch to the monogram |
+| `R3_book_bubble` | Open book whose left page ends in a speech-bubble tail | Language schools, tutoring, reading | Stroke-based: weakest at 16 px — the kit then switches the favicons to a simplified monogram automatically and says so in kit-report.md |
 | `R4_shield` | Shield with a cut-out check | Security, insurance, clinics, verification | Very common in security — keep the wordmark strong |
 | `R5_taaq_arch` | Pointed Persian arch (taaq) cut from a square | Architecture, hospitality, culture | **Only when the subject is related.** Original shape, not a copy of a building |
 | `R6_arrow` | Diagonal arrow cut from a circle | Logistics, growth, fintech, "go" | Arrows are generic; pair with a distinctive wordmark |
