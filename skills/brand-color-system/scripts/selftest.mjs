@@ -62,6 +62,23 @@ for (const feel of ['trust', 'calm', 'playful', 'premium', 'tech', 'heritage', '
   const p = buildPalette({ feel, lang: 'fa' });
   check(p.failures.length === 0, `feel ${feel}: failing pairs`);
 }
+// accent policy: derived accents never sit near error red / success green; industry defaults behave
+const { INDUSTRIES, ACCENT_STATUS_GAP } = await import('./palette-engine.mjs');
+for (const b of brands) {
+  for (const industry of [undefined, ...Object.keys(INDUSTRIES)]) {
+    const p = buildPalette({ brand: b, industry });
+    if (p.scales.accent === p.scales.brand) continue;
+    const h = p.scales.accent[5].lch.h;
+    check(C.hueDiff(h, 27) >= ACCENT_STATUS_GAP - 1 && C.hueDiff(h, 150) >= ACCENT_STATUS_GAP - 1, `${b} ${industry || 'no industry'}: accent hue ${h.toFixed(0)} too close to a status hue`);
+    check(p.failures.length === 0, `${b} ${industry}: failing pairs with accent policy`);
+  }
+}
+const edu = buildPalette({ brand: '#0d9488', industry: 'education' }).scales.accent[5].lch;
+check(Math.abs(edu.h - 88) < 6 && edu.c > 0.08, `teal + education → saffron-gold accent (got hue ${edu.h.toFixed(0)})`);
+const fin = buildPalette({ brand: '#1e3a8a', industry: 'finance' }).scales.accent[5].lch;
+check(fin.c <= 0.075, `finance → restrained low-chroma accent (got chroma ${fin.c.toFixed(3)})`);
+check(buildPalette({ brand: '#0d9488', accent: '#e11d48' }).warnings.some((w) => /error red/.test(w)), 'user accent near error red is kept but warned');
+check(buildPalette({ brand: '#0d9488', industry: 'education', harmony: 'analogous' }).decisions.some((d) => /your choice/.test(d)), '--harmony overrides the industry policy');
 const muted = buildPalette({ brand: '#64748b' });
 check(Math.max(...muted.scales.brand.map((s) => s.lch.c)) < 0.07, 'muted brand stays muted (no chroma floor)');
 

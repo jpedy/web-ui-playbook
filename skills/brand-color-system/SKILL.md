@@ -13,7 +13,7 @@ You choose colors for a user with **no design background**. They give a brand co
 
 ### 1. Intake — only what's missing (max 5 short questions, one message)
 1. **Do you already have a brand color?** (a hex code, or a logo file to read it from, or "no")
-2. **What is the business and who is it for?** (skip if known from web-ui-playbook intake)
+2. **What is the business and who is it for?** (skip if known from web-ui-playbook intake) — it sets `--industry`, which picks the accent
 3. **Feel?** Offer 3 fitting options from `references/industry-feel-lookup.md` §1, e.g. "trustworthy / calm / playful".
 4. **Persian / users inside Iran?** (decides `--lang fa` and `--market iran`)
 5. **Any competitor colors to stay away from?** (optional; known Iranian brands are checked automatically with `--market iran`)
@@ -22,10 +22,10 @@ If the user says "you decide": use their brand color if any, otherwise the feel 
 
 ### 2. Generate — from the user's project folder
 ```bash
-node <this-skill-dir>/scripts/generate-palette.mjs --brand "#0f766e" --lang fa --market iran --name "Zabansara" --out resources/css/brand
+node <this-skill-dir>/scripts/generate-palette.mjs --brand "#0f766e" --industry education --lang fa --market iran --name "Zabansara" --out resources/css/brand
 node <this-skill-dir>/scripts/generate-palette.mjs --feel calm --lang fa --market iran --out resources/css/brand    # no brand color yet
 ```
-Options worth knowing (full list: `--help`): `--accent "#hex"` (keep the user's accent), `--harmony analogous|complementary|split|none`, `--neutral tinted|pure|warm|cool`, `--on-primary white|dark` (button label choice), `--competitor "#hex:Name"`.
+Options worth knowing (full list: `--help`): `--industry education|kids|finance|government|health|saas|ecommerce|luxury|culture…` (picks the accent: warm saffron-gold for education and kids, a quiet tone for finance and government), `--accent "#hex"` (keep the user's accent), `--harmony analogous|complementary|split|none` (overrides the industry), `--neutral tinted|pure|warm|cool`, `--on-primary white|dark` (button label choice), `--competitor "#hex:Name"`.
 
 Output (in the project, never in the skill folder — the script refuses that):
 - `palette.css` — drop-in color tokens for web-ui-playbook (`--bg … --primary … --danger`, plus `--brand`, `--primary-ink`, `--accent-fg`), `.dark` values, `@theme inline` mapping, full scales (`brand-*`, `accent-*`, `base-*`)
@@ -34,7 +34,7 @@ Output (in the project, never in the skill folder — the script refuses that):
 - `palette-preview.html` — light and dark mock UI + scales; open it in the browser (or screenshot it) and look before you continue
 
 ### 3. Explain — 2–4 plain sentences, from the console "decisions" lines
-Always say: where the exact brand color sits (e.g. "kept exactly as brand-700"), what the buttons use and why, which class to use for brand-colored links (`text-primary-ink`), the accent's job (≤ 10% of the screen), and any ⚠ warning (competitor closeness, status hue near the brand). Example: "Your teal stays exactly as it is. White text on it is 5.5:1, so buttons use it directly. Links use a darker teal so small text stays readable. The pink accent is only for badges and highlights."
+Always say: where the exact brand color sits (e.g. "kept exactly as brand-700"), what the buttons use and why, which class to use for brand-colored links (`text-primary-ink`), the accent's job (≤ 10% of the screen), and any ⚠ warning (competitor closeness, status hue near the brand). Example: "Your teal stays exactly as it is. White text on it is 5.5:1, so buttons use it directly. Links use a darker teal so small text stays readable. The saffron-gold accent is only for badges and highlights."
 
 ### 4. Integrate (with web-ui-playbook)
 - Copy web-ui-playbook's `assets/tokens.css` into the project if it isn't there yet, then `@import "./brand/palette.css";` right **after** the tokens import (later definitions win; palette.css has no `@import "tailwindcss"`).

@@ -29,7 +29,7 @@ Its OKLab math and APCA code were correct and match culori / apca-w3 exactly; `c
 3. **Anchor.** The stop whose lightness is closest to the brand gets the **exact brand hex**. The other stops' lightness shifts smoothly toward it (full shift at the anchor, none at 50 and 950), so steps stay in order. `--anchor-stop 600` forces a stop.
 4. **Chroma.** Peak chroma = brand chroma ÷ the curve's value at the anchor stop (capped at 0.37); each stop = peak × its relative chroma. Then each color is pulled inside sRGB by lowering chroma only (L and H kept). Near-gray brands (C < 0.02) produce a gray scale.
 5. **Neutrals ("base").** Tailwind-gray lightness with a faint tint of the brand hue: chroma ≤ 0.018 (cool brands) / 0.012 (warm brands). `--neutral pure|warm|cool` overrides.
-6. **Accent.** `--accent` hex is anchored like the brand. Otherwise hue = brand + 180° (complementary, default), + 35° (analogous) or + 150° (split), or the feel's fixed accent; then nudged ≥ 30° away from danger red (27°) and success green (150°).
+6. **Accent.** `--accent` hex is anchored like the brand (kept exactly; a warning appears if it sits within 45° of error red or success green). Otherwise the hue comes from, in order of precedence: `--harmony` → the `--industry` policy (`industry-feel-lookup.md` §2: warm saffron-gold 88° for education, kids, food and culture; a quiet analogous tone with chroma ≤ 0.07 for finance, government, health and legal; analogous for SaaS; complementary for shops; soft gold for luxury) → the feel's accent → complementary (brand + 180°). A derived accent must sit **≥ 45° from error red (27°) and success green (150°)** and ≥ 25° from the brand hue. If the preferred hue fails, the generator tries saffron-gold, then the two split hues, then the nearest allowed hue, and says why — this prevents a pink accent sitting next to error red.
 7. **Status scales.** success 150°, warning 70°, danger 27°, info 250° by default. If the brand or accent hue is within 25°, the status hue moves inside its range (success 135–172, warning 52–88, danger 12–38, info 215–268) to the most distant hue; if still < 20° apart, a warning says icons and words must carry the meaning.
 8. **Tokens.** Light and dark tokens are picked by searching the scales for the first shade that passes (section 3).
 9. **Checks.** Every pair in `token-pairs.mjs`, both modes, plus: color-vision simulation of status/primary pairs (Machado 2009, full severity), competitor distance (`--market iran`, `--competitor`).
@@ -67,6 +67,7 @@ A brand too close to white (e.g. `#ffffff`) can't be a button on a white card; t
 | keep the exact brand on buttons with a dark label | `--on-primary dark` |
 | always white labels (darker button) | `--on-primary white` |
 | a specific accent | `--accent "#f59e0b"` |
+| the accent usual for the kind of site | `--industry education` (warm), `--industry finance` (restrained) … |
 | no accent (monochrome) | `--harmony none` |
 | pure / warm / cool grays | `--neutral pure|warm|cool` |
 | brand at a specific stop | `--anchor-stop 500` |

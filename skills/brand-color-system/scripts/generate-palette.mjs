@@ -11,7 +11,10 @@
  *   --accent <hex>           exact accent color (otherwise derived from --harmony / --feel)
  *   --feel <name>            trust | calm | playful | premium | tech | heritage | minimal (seed when no --brand)
  *   --hue <deg> [--chroma <c>] [--lightness <l>]   manual seed in OKLCH when no --brand
- *   --harmony <h>            complementary (default) | analogous | split | none
+ *   --industry <name>        education | kids | food | consumer | travel | culture (warm saffron-gold accent),
+ *                            finance | government | health | legal (restrained accent), saas (analogous),
+ *                            ecommerce (complementary), luxury (soft gold) - see references/industry-feel-lookup.md §2
+ *   --harmony <h>            complementary (default) | analogous | split | none - overrides --industry
  *   --neutral <n>            tinted (default) | pure | warm | cool
  *   --on-primary <m>         auto (default) | white | dark — label color on buttons
  *   --anchor-stop <stop>     force the brand color onto a stop (50…950)

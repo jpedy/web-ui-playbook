@@ -47,7 +47,7 @@ Painter's color wheels exaggerate some hue distances; in UI, harmony is about **
 | Split | brand + 150° / 210° | consumer, playful | keep one of them small |
 | Triadic | ± 120° | charts, kids' categories | not for UI chrome |
 
-The generator picks the accent from `--harmony` (default complementary) and then nudges it ≥ 30° away from "error red" and "success green" so an accent never reads as a status message. Status colors keep their usual hues; if the brand itself is red or green, the generator moves the clashing status hue within its range and warns that icons and words must carry the meaning.
+The generator picks the accent from `--harmony`, or from the `--industry` policy (warm saffron-gold for education and kids, a quiet tone for finance and government — `industry-feel-lookup.md` §2), and keeps any derived accent ≥ 45° away from "error red" and "success green" so an accent never reads as a status message. Status colors keep their usual hues; if the brand itself is red or green, the generator moves the clashing status hue within its range and warns that icons and words must carry the meaning.
 
 ## 5. Color psychology: what holds up and what doesn't
 - **Lightness and chroma move feelings more than hue.** Soft, light, low-chroma colors read calm; saturated mid-light colors read energetic `[Proven, color report §5 citing Elliot & Maier; Wilms & Oberfeld]`.

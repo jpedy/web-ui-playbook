@@ -39,13 +39,58 @@ export const FEELS = {
   trust: { h: 255, c: 0.15, l: 0.48, harmony: 'complementary', label: 'trustworthy, serious (navy / cobalt)' },
   calm: { h: 182, c: 0.1, l: 0.55, harmony: 'analogous', label: 'calm, caring (teal / sage)' },
   playful: { h: 35, c: 0.19, l: 0.64, harmony: 'split', label: 'playful, energetic (coral / orange)' },
-  premium: { h: 330, c: 0.08, l: 0.36, accentH: 80, label: 'premium, restrained (deep plum + gold)' },
+  premium: { h: 330, c: 0.08, l: 0.36, accentH: 85, label: 'premium, restrained (deep plum + gold)' },
   tech: { h: 277, c: 0.2, l: 0.52, harmony: 'analogous', label: 'modern, technical (indigo / violet)' },
-  heritage: { h: 205, c: 0.12, l: 0.55, accentH: 75, label: 'heritage, Iranian (feroozeh turquoise + saffron)' },
+  heritage: { h: 205, c: 0.12, l: 0.55, accentH: 88, label: 'heritage, Iranian (feroozeh turquoise + saffron)' },
   minimal: { h: 260, c: 0.02, l: 0.25, accentH: 255, label: 'minimal, neutral (near-black + blue)' },
 };
 export const FEEL_ALIASES = { trustworthy: 'trust', serious: 'trust', fintech: 'trust', caring: 'calm', health: 'calm', fun: 'playful', friendly: 'playful', kids: 'playful', energetic: 'playful', luxury: 'premium', modern: 'tech', saas: 'tech', traditional: 'heritage', iranian: 'heritage', neutral: 'minimal' };
 const HARMONY = { analogous: 35, complementary: 180, split: 150 };
+
+/**
+ * Accent policy per industry (used when there is no --accent and no --harmony).
+ * warm = saffron-gold; restrained = quiet low-chroma analogous; gold = soft gold; others = harmony offsets.
+ * Documented in references/industry-feel-lookup.md §2.
+ */
+export const INDUSTRIES = {
+  education: { accent: 'warm', label: 'education and course sites' },
+  kids: { accent: 'warm', label: 'children\'s products and learning apps' },
+  food: { accent: 'warm', label: 'food, cafés and restaurants' },
+  consumer: { accent: 'warm', label: 'friendly consumer apps' },
+  travel: { accent: 'warm', label: 'travel and tourism' },
+  finance: { accent: 'restrained', label: 'banking, payments and insurance' },
+  government: { accent: 'restrained', label: 'government and civic services' },
+  health: { accent: 'restrained', label: 'health and clinics' },
+  legal: { accent: 'restrained', label: 'legal and professional services' },
+  saas: { accent: 'analogous', label: 'SaaS and developer tools' },
+  ecommerce: { accent: 'complementary', label: 'shops and marketplaces' },
+  luxury: { accent: 'gold', label: 'luxury and hospitality' },
+  culture: { accent: 'warm', label: 'culture, crafts and heritage' },
+};
+export const INDUSTRY_ALIASES = {
+  school: 'education', courses: 'education', language: 'education', edtech: 'education', university: 'education',
+  children: 'kids', toys: 'kids', restaurant: 'food', cafe: 'food', fintech: 'finance', bank: 'finance', insurance: 'finance',
+  civic: 'government', medical: 'health', clinic: 'health', wellness: 'health', tech: 'saas', devtools: 'saas', ai: 'saas',
+  shop: 'ecommerce', marketplace: 'ecommerce', hotel: 'luxury', fashion: 'luxury', jewellery: 'luxury', jewelry: 'luxury',
+  heritage: 'culture', crafts: 'culture', tourism: 'travel',
+};
+const WARM_ACCENT_H = 88; // saffron-gold
+const GOLD_ACCENT_H = 85;
+/** A derived accent keeps at least this many degrees from error red and success green. */
+export const ACCENT_STATUS_GAP = 45;
+
+/**
+ * First hue in `candidates` that is ≥ ACCENT_STATUS_GAP from danger/success and ≥ 25° from the brand hue;
+ * otherwise the nearest such hue to the first candidate.
+ */
+function safeAccentHue(candidates, brandH) {
+  const norm = (h) => ((h % 360) + 360) % 360;
+  const ok = (h) => hueDiff(h, STATUS.danger.h) >= ACCENT_STATUS_GAP && hueDiff(h, STATUS.success.h) >= ACCENT_STATUS_GAP && (brandH == null || hueDiff(h, brandH) >= 25);
+  const list = candidates.map(norm);
+  for (let i = 0; i < list.length; i++) if (ok(list[i])) return { h: list[i], moved: i > 0, from: list[0] };
+  for (let d = 1; d <= 180; d++) for (const h of [list[0] + d, list[0] - d]) if (ok(norm(h))) return { h: norm(h), moved: true, from: list[0] };
+  return { h: list[0], moved: false, from: list[0] };
+}
 
 // Status hue windows (default first). The guard keeps them away from brand/accent hues.
 const STATUS = {
@@ -136,7 +181,7 @@ function hoverIndex(scale, i, fg, min, needVisible = true) {
 
 /**
  * Build the full palette.
- * opts: { brand, accent, feel, hue, chroma, lightness, harmony, neutral, onPrimary, lang, competitors, anchorStop, name }
+ * opts: { brand, accent, feel, industry, hue, chroma, lightness, harmony, neutral, onPrimary, lang, competitors, anchorStop, name }
  */
 export function buildPalette(opts = {}) {
   const fa = opts.lang === 'fa' || opts.lang === 'both';
@@ -185,21 +230,45 @@ export function buildPalette(opts = {}) {
     accent = buildScale({ anchor: { hex: aHex, lch: hexToOklch(aHex) } });
     accentAnchored = true;
     decisions.push(`Your accent color ${aHex} is kept exactly as accent-${STOPS[accent.findIndex((s) => s.anchored)]}.`);
+    const near = [STATUS.danger, STATUS.success].filter((s) => hueDiff(accent[5].lch.h, s.h) < ACCENT_STATUS_GAP && accent[5].lch.c >= 0.04);
+    if (near.length) warnings.push(`Your accent ${aHex} is close in hue to the ${near.map((s) => (s === STATUS.danger ? 'error red' : 'success green')).join(' and ')} status color, so badges in it may be read as messages. Keep it away from alerts, or pick an accent ≥ ${ACCENT_STATUS_GAP}° away.`);
   } else {
-    const harmony = opts.harmony || (feel?.accentH != null ? 'fixed' : feel?.harmony) || 'complementary';
-    if (harmony === 'none') accent = primary;
+    // Precedence: --harmony flag > --industry policy > the feel's accent > complementary.
+    const industryKey = opts.industry ? (INDUSTRIES[opts.industry] ? opts.industry : INDUSTRY_ALIASES[opts.industry]) : null;
+    if (opts.industry && !industryKey) throw new Error(`Unknown --industry "${opts.industry}". Use one of: ${Object.keys(INDUSTRIES).join(', ')}`);
+    const policy = opts.harmony ? opts.harmony : industryKey ? INDUSTRIES[industryKey].accent : feel?.accentH != null ? 'fixed' : feel?.harmony || 'complementary';
+    if (policy === 'none') accent = primary;
     else {
-      const raw = harmony === 'fixed' ? feel.accentH : (chromatic ? brandLch.h : 255) + (HARMONY[harmony] ?? 180);
-      let aH = ((raw % 360) + 360) % 360;
-      // A derived accent must not look like "error" red or "success" green: nudge it ≥ 30° away.
-      for (const sem of [STATUS.danger.h, STATUS.success.h]) {
-        if (hueDiff(aH, sem) < 30) {
-          const away = ((aH - sem + 540) % 360) - 180; // signed distance from the semantic hue
-          aH = (sem + (away >= 0 ? 30 : -30) + 360) % 360;
-        }
+      const baseH = chromatic ? brandLch.h : 255;
+      let pref;
+      let why;
+      let cPeak = Math.min(0.2, Math.max(0.12, brandLch.c / 0.9));
+      if (policy === 'warm') {
+        // Saffron-gold: warm and friendly, far from error red and success green (and lets "warning" move to orange).
+        pref = hueDiff(WARM_ACCENT_H, baseH) >= 30 ? WARM_ACCENT_H : baseH + 180;
+        why = pref === WARM_ACCENT_H ? `a warm saffron-gold, because ${INDUSTRIES[industryKey]?.label || 'this kind of site'} work best with a warm, friendly accent` : 'complementary, because your brand is already warm-yellow';
+      } else if (policy === 'restrained') {
+        pref = baseH + 35;
+        cPeak = 0.07;
+        why = `a quiet analogous tone (low chroma), because ${INDUSTRIES[industryKey]?.label || 'this kind of site'} should look restrained`;
+      } else if (policy === 'gold') {
+        pref = GOLD_ACCENT_H;
+        cPeak = 0.1;
+        why = 'a soft gold, for a premium feel';
+      } else if (policy === 'fixed') {
+        pref = feel.accentH;
+        why = 'set by the feel';
+      } else {
+        pref = baseH + (HARMONY[policy] ?? 180);
+        why = opts.harmony ? `${policy} (your choice)` : industryKey ? `${policy}, the usual choice for ${INDUSTRIES[industryKey].label}` : policy;
       }
-      accent = buildScale({ h: aH, cPeak: Math.min(0.2, Math.max(0.12, brandLch.c / 0.9)) });
-      decisions.push(`Accent hue ${Math.round(aH)}° (${harmony === 'fixed' ? 'set by the feel' : harmony}). Use it for at most ~10% of the screen: badges, highlights, illustrations — never as a second button color.`);
+      // Fallback order when the preferred hue sits too close to a status color: saffron-gold, then the two split hues.
+      const pick = safeAccentHue([pref, WARM_ACCENT_H, baseH + 150, baseH + 210], chromatic ? brandLch.h : null);
+      accent = buildScale({ h: pick.h, cPeak });
+      const text = pick.moved
+        ? `Accent hue ${Math.round(pick.h)}°${Math.round(pick.h) === WARM_ACCENT_H ? ' (saffron-gold)' : ''}: the ${why} hue would be ${Math.round(pick.from)}°, within ${ACCENT_STATUS_GAP}° of error red or success green, so badges could be mistaken for messages`
+        : `Accent hue ${Math.round(pick.h)}°: ${why}`;
+      decisions.push(`${text}. Use it for at most ~10% of the screen: badges, highlights, illustrations — never as a second button color.`);
     }
   }
 
