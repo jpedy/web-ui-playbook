@@ -1,0 +1,21 @@
+{
+  "name": {
+    "fa": "زبان‌سرا",
+    "en": "Zabansara"
+  },
+  "tagline": {
+    "fa": "آموزشگاه زبان انگلیسی",
+    "en": "English language school"
+  },
+  "industry": "education",
+  "monogram": "ز",
+  "market": "iran",
+  "colors": {
+    "primary": "#0d9488",
+    "ink": "#1a4e4a",
+    "accent": "#d9b863",
+    "onDark": "#f2fdfa",
+    "onDarkMuted": "#a3f4e3",
+    "darkBg": "#060807"
+  }
+}
