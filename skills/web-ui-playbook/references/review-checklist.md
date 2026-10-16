@@ -3,12 +3,12 @@
 **When:** after building any page or component, before telling the user it's done.
 
 **How:**
-1. Run the automated audit: `node <skill-dir>/scripts/audit.mjs <files-or-folder> [--iran] --contrast --css <css-folder>`. Items marked **[auto]** below are checked by it. `--contrast` checks every text element against its background in light and dark mode; anything it lists under "could not resolve" (dynamic classes, components, background images, unknown colors) is **not** passed — check those in the browser.
+1. Run the automated audit: `node <skill-dir>/scripts/audit.mjs <files-or-folder> [--iran] --contrast --css <css-folder> --slop` (add `--render <built-page.html>` when a built page and Chrome/Edge exist). Items marked **[auto]** below are checked by it. `--contrast` checks every text element against its background in light and dark mode; anything it lists under "could not resolve" (dynamic classes, components, background images, unknown colors) is **not** passed — check those in the browser.
 2. Check the remaining items by reading your code and, if a browser or preview tool is available, by viewing the page at **375px and 1440px** (plus 320px for overflow).
 3. **Fix every failed item** — don't just list it — then re-run the audit.
 4. Report with the template at the end.
 
-Only check the sections that apply: A always; B for English/LTR; C for any Persian; D and E when users are inside Iran.
+Only check the sections that apply: A and F always; B for English/LTR; C for any Persian; D and E when users are inside Iran.
 
 ## A. Universal (every build)
 **Direction and system**
@@ -46,7 +46,7 @@ Only check the sections that apply: A always; B for English/LTR; C for any Persi
 **Content and trust**
 - [ ] No lorem ipsum, "John Doe" or fake logos/testimonials. Every value the user must replace (numbers, names, prices, contact, eNamad, license) is marked `<!-- PLACEHOLDER: what -->` (Blade: `{{-- PLACEHOLDER: what --}}`). The audit lists them; copy that list into the report.
 - [ ] Prices show the total and recurring terms; no fake urgency; cookie choices symmetric if a banner exists.
-- [ ] Anti-slop pass (`visual-direction.md` §6): no purple-AI gradients, emoji icons, vague hero copy, card-in-card.
+- [ ] Slop audit and substance pass done (§F).
 
 ## B. English / LTR
 - [ ] Sentence-case labels; display headings use slight negative tracking (−0.02 to −0.03em) only on Latin text.
@@ -82,6 +82,23 @@ Only check the sections that apply: A always; B for English/LTR; C for any Persi
 - [ ] SEO: `lang="fa-IR"`, English or ID slugs (no Finglish), JSON-LD `priceCurrency: "IRR"` with Toman × 10.
 - [ ] Every time-sensitive claim shown to the user (providers, prices, regulations) is marked "verify before launch".
 
+## F. Slop audit and substance (every page) — `anti-generic.md`
+**The audit passing is not proof the page is good.** It finds tells and lists claims; it cannot judge substance or verify truth.
+
+**[auto] `--slop`** (warnings — fix, or keep and say why):
+- [ ] Generic copy and buttons (`slop-filler`, `slop-cta`, `slop-link-purpose`), layout tells (`slop-cards`, `slop-repeat-sections`, `slop-pill-badge`, `slop-blob`, `slop-glass`, `slop-gradient-text`), motion hygiene (`slop-motion`, `slop-reveal-gate`), small Persian text (`slop-small-fa`), emoji, lorem, placeholder image hosts, fake seals.
+- [ ] **Claims to confirm:** every number, superlative and quote the audit lists goes into the report for the owner — including ones marked PLACEHOLDER. None may be invented; a source comment is not proof.
+- [ ] `--render` (optional): browser contrast after JS ran, overflow and headline lines at 1440/768/375, fonts loaded, no request left the machine. Pairs it could not resolve stay unresolved — check by eye.
+
+**By eye — seven passes, at most two rounds of fixes** (adapted from taste-skill `skills/taste-skill/references/critique.md` passes 1–4, 9, 10, 12 — L21–30, L46–48, L55; the other seven passes are covered by sections A–C or rejected):
+1. **One second** — glance and look away: one thing should stay with you (the offer or the signature detail).
+2. **Squint** — the page reduces to two or three clear masses; the primary action is still findable.
+3. **Cover the logo** — could this first screen belong to the nearest competitor? If yes, use the subject inventory (`anti-generic.md` §1).
+4. **Edges** — count the start edges (right side in RTL); 2–3 shared lines, not a new one per block.
+5. **Sameness** — one layout word per section (statement / split / table / list / full-bleed); no three alike in a row.
+6. **Phone** — at 375px: hero and CTA in the first screen, nothing cramped, Persian lines not clipped.
+7. **Substance** — for every section write: *claim · proof from the owner · present?* Every section must state a claim and carry real proof. **Sections without real proof are marked on the page (visible PLACEHOLDER) and listed in the report** — or cut. Do not let removing tells leave the page thin.
+
 ---
 
 ## Report template (use exactly this at the end of a build)
@@ -93,6 +110,12 @@ Fixed:
 - <what was wrong> → <what I changed> (<file:line>)
 - …
 Contrast (--contrast): <n> text checks · <n> pass · <n> fixed · <n> could not resolve → checked by eye: <list>
+Render (--render): <browser> · <n> checks · <n> fail · <n> unresolved · overflow / headline lines / fonts / external requests  (or: skipped — no browser)
+Slop (--slop): <n> warnings → <n> fixed, <n> kept (why)
+Claims to confirm (every number, superlative and quote — the audit cannot verify them):
+- <file:line> «…» — placeholder | from the owner? <yes/no>
+Substance pass: <section — claim — proof — present? / marked PLACEHOLDER>
+Note: passing the audit does not prove the page is good; the by-eye passes above are the review.
 Checked manually: <viewports / keyboard / contrast / dark mode>
 Needs your input: <real logos, eNamad ID, prices, photos, legal text…>
 Verify before launch (time-sensitive): <providers, prices, regulations used>

@@ -139,6 +139,9 @@
   --text-h2: clamp(1.75rem, 1.3rem + 2vw, 2.75rem);
   --text-h2--line-height: 1.18;
   --text-body: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
+  /* 13px caption: the smallest size for Persian text (house rule — dots and joins blur below it) */
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.6;
   --text-body--line-height: 1.6;
 
   /* Radius — EDIT personality: sharp (4/6/8/12) · standard (6/8/12/16) · soft (8/12/16/24) */

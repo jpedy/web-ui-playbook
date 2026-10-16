@@ -1,0 +1,27 @@
+<!doctype html>
+<!-- Fixture for audit.mjs --render (scripts/selftest.mjs). Colors change only after JS runs:
+     #late gets a low-contrast class from a timer, #raf appears only in a requestAnimationFrame callback
+     (the way Alpine's x-show works), .hero text sits on a gradient (must stay unresolved), and an image
+     points at a foreign host (must be blocked and reported). Plain JS — no framework needed. -->
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8"><title>render fixture</title>
+<style>
+  :root { --bg: #ffffff; --text: #111827; } .dark { --bg: #0b1220; --text: #f3f4f6; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: sans-serif; }
+  .faint { color: #cbd5e1; } .hidden { display: none; } .chip { background: #fde68a; color: #fef3c7; }
+  .hero { background-image: linear-gradient(#0d9488, #115e59); color: #fff; }
+</style>
+</head>
+<body>
+  <h1>آزمون رندر</h1>
+  <p id="late">رنگ این متن بعد از اجرای اسکریپت کم‌رنگ می‌شود</p>
+  <span id="raf" class="chip hidden">فقط در فریم انیمیشن ظاهر می‌شود</span>
+  <section class="hero"><p>متن روی گرادیان</p></section>
+  <img src="https://example.com/pixel.png" alt="" width="1" height="1">
+  <script>
+    setTimeout(function () { document.getElementById('late').className = 'faint'; }, 300);
+    setTimeout(function () { requestAnimationFrame(function () { document.getElementById('raf').classList.remove('hidden'); }); }, 400);
+  </script>
+</body>
+</html>

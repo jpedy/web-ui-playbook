@@ -61,7 +61,7 @@ Persian glyphs look smaller than Latin at the same size and need vertical room f
 | Body | 16px / 15–16px (prefer 16) | **1.75–1.9** | 400 | 55–70ch |
 | Long-form article | 18px | ~1.9 (Virgool: 18px / 34px) | 400 | 60–70ch |
 | UI controls (buttons, inputs) | 14–16px | 1.5–1.6 | 500–600 | — |
-| Captions, badges | 12–13px (never < 12) | 1.6–1.7 | 400–500 | 40–60ch |
+| Captions, badges | **13px minimum** (house rule) | 1.6–1.7 | 400–500 | 40–60ch |
 
 - *Conflict:* report B says body line-height 1.7–1.85; report C says 1.75–1.9 → **minimum 1.75**.
 - **Tailwind classes for this table** (tested):
@@ -70,7 +70,7 @@ Persian glyphs look smaller than Latin at the same size and need vertical room f
   - H3: `text-lg md:text-xl font-bold`
   - Body: `text-base` (lead text: `text-lg`)
   - Controls: `text-sm`/`text-base font-semibold`
-  - Captions: `text-xs`/`text-sm`
+  - Captions: `text-caption` (13px, from `tokens.css`) or `text-sm` — never `text-xs` (12px) on Persian text; `audit.mjs --slop` warns (`slop-small-fa`) and `--render` measures it
   - Don't add `leading-*`: `persian-base.css` redefines Tailwind's per-size line-heights under `:lang(fa)` (body 1.8, headings 1.4–1.55), so plain `text-*` classes come out correct.
 - When translating an English design, make Persian text **1–2px larger** and its line-height 10–15% taller.
 - **Weights:** never 100/200 for Persian text; nothing under 400 below 16px (dots blur).
@@ -179,6 +179,14 @@ Write logical properties **only**. Then the same markup works in both directions
 - Forms: labels right-aligned (start); primary button at the start (right) or full width on mobile.
 - Tab order must run right→left. Rely on DOM order + flex/grid in RTL; never `float:left`, `left:` coordinates or hardcoded `grid-column: 1` to place things visually.
 - Truncation: `text-overflow: ellipsis` / `line-clamp` with real `dir="rtl"` puts `…` on the left. Never `.slice(0,20)+'...'` in JS (it can cut mid-word or at a ZWNJ).
+
+### Motion and scrolling in RTL
+- Slide/reveal directions follow the reading direction: an element that "enters from the start" comes from the **right** — use `rtl:` variants or logical transforms, never a fixed `translateX(-…)`.
+- Masked line reveals (overflow-hidden per line) need padding **top and bottom**, or the dots above and below Persian letters are clipped.
+- No marquees of Persian text — moving RTL text is unreadable. A logo strip may move (paused on hover, off under reduced motion), duplicated for a seamless loop and running toward the end side.
+- Carousels and horizontal scrollers: the first item is at the **right**; `scrollLeft` is 0 at the start and **negative** toward the end in Chrome/Firefox/Safari RTL — use `scrollBy({ left: -w })` for "next" and test both buttons.
+- Pinned stories use CSS `position: sticky`; never horizontal scroll-jacking (its pan math breaks in RTL and janks low-end Android).
+- Motion baseline (html.js gate, reveal once, reduced motion keeps fades): `components-and-states.md` § Motion baseline.
 
 ## 12. Persian accessibility `[Proven]`
 - `lang="fa"` on `<html>` and `lang="en"` on English fragments, so NVDA/TalkBack switch voices. Without `lang="fa"`, English voices skip or garble Persian.

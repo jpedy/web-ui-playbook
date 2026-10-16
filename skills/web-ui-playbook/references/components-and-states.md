@@ -16,7 +16,8 @@ RTL note: everything here uses logical properties (`ps-*`/`pe-*`/`ms-*`/`me-*`/`
 9. Icons
 10. Charts (dashboards)
 11. UX copy (English and Persian)
-12. Common mistakes
+12. Motion baseline
+13. Common mistakes
 
 ---
 
@@ -169,7 +170,25 @@ Hover must never be the only way to reveal something: touch has no hover `[Prove
 
 **Persian:** see `persian-rtl.md` §13 (polite «شما», verbal-noun buttons, standard error phrasing, glossary of common UI strings).
 
-## 12. Common mistakes
+## 12. Motion baseline
+**Baseline only** — the minimum every page follows; detailed motion recipes are not part of this version. Default for Iranian audiences: **calm** (state feedback + reveal-once; at most one signature move). Ideas adapted from taste-skill `references/motion.md` L75–87 and L281 (see `anti-generic.md`).
+1. **Content is visible without JavaScript.** Hide-before-reveal styles apply only under `html.js`, set by one inline line in `<head>`; if JS fails or loads slowly, everything is simply visible:
+   ```html
+   <script>document.documentElement.classList.add('js')</script>
+   <style>
+     @media (prefers-reduced-motion: no-preference) {
+       .js [data-reveal] { opacity: 0; transform: translateY(12px); transition: opacity .3s ease-out, transform .3s ease-out; }
+     }
+     .js [data-reveal].is-in { opacity: 1; transform: none; }
+     @media (prefers-reduced-motion: reduce) { .js [data-reveal] { opacity: 0; transition: opacity .2s linear; } }
+   </style>
+   ```
+2. **Reveal once.** Add `is-in` the first time the element enters the viewport, never again on scroll back (Alpine: `x-intersect.once="$el.classList.add('is-in')"`; plain JS: `IntersectionObserver` + `unobserve`). Not on body text inside articles.
+3. **Reduced motion keeps fades** — it removes movement, not feedback (the `reduce` rule above keeps a short opacity fade); state feedback (hover, focus, pressed) stays.
+4. **No scroll hijacking:** no smooth-scroll/inertia libraries, no scroll-jacked horizontal pans, no custom cursors. A pinned story is CSS `position: sticky`.
+5. Hygiene: transform/opacity only, 150–300ms, ease-out for entering; never `transition-all`, `ease-in` or `scale(0)` entrances (`audit.mjs --slop` warns). RTL directions: `persian-rtl.md` §11.
+
+## 13. Common mistakes
 - Two or more solid primary buttons competing in one section.
 - Placeholder used as the label; errors shown only as a red border.
 - Fixed-height badges that clip Persian dots; `h-8` buttons with `leading-none`.

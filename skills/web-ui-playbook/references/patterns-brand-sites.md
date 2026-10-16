@@ -16,6 +16,8 @@ Use this for company sites, product and SaaS marketing pages, campaign landings,
 ## 1. Default page skeleton (landing / home)
 Order matters: answer "what is it, is it for me, can I trust it, what does it cost, what do I do next".
 
+**Argument first** (`anti-generic.md` §1): treat the list below as the questions to answer, not a fixed template. Write the page as claims with the owner's proof, one line per section; the claims decide which sections exist and their order. A section with no real proof is cut, or kept with a visible PLACEHOLDER and listed for the owner.
+
 1. **Header**: logo · 5–7 nav links · 1 primary CTA
 2. **Hero**: outcome headline + subheadline + primary CTA (+ secondary) + product/visual proof
 3. **Social proof bar**: logos or metrics directly under the hero
@@ -44,7 +46,7 @@ Mobile (general practice and Iranian convention): on long landing pages, show a 
 
 ### Social proof bar `[Proven]`
 - 5–7 logos per row on desktop (gap 32–48px), 2–3 per row on mobile, monochrome at 60–70% opacity → 100% on hover (150ms).
-- Or 3–4 metric cards ("۱۲٬۰۰۰ students", "4.8/5 from 900 reviews"), each with a source.
+- Or 3–4 metric cards — **only numbers the owner gave you** (a source comment is not proof; `audit.mjs --slop` lists every number for confirmation). No number yet → a visible placeholder, not an invented one.
 - Moving logo tickers need a pause control (WCAG 2.2). A static grid is simpler.
 - Only real, verifiable proof. If the user has none yet, leave clearly marked placeholders and tell them.
 
@@ -59,7 +61,7 @@ Mobile (general practice and Iranian convention): on long landing pages, show a 
 - 3 steps, numbered (Persian digits on Persian pages), icon/number 40–48px, title + one sentence each. Horizontal on desktop (connected by a line), vertical on mobile. The step order follows reading direction (step 1 at the start edge).
 
 ### Testimonials
-- 2–3 strong ones beat 12 weak ones: photo 40–56px, name, role or company (or city, for Iranian consumers), a quote ≤ 3 lines, and a result number if one exists.
+- Only real quotes from real customers, with their consent, supplied by the owner (the audit lists every quote for confirmation). 2–3 strong ones beat 12 weak ones: photo 40–56px, name, role or company (or city, for Iranian consumers), a quote ≤ 3 lines, and a result number if one exists.
 - Video or voice-note testimonials convert well for Iranian education services `[Proven, report C §8]`. Embed them from a domestic host for Iran (`iran-network-resilience.md`).
 
 ### Pricing `[Proven]`
@@ -82,11 +84,12 @@ Mobile (general practice and Iranian convention): on long landing pages, show a 
 ### Footer
 - 3–4 link columns, contact (phone, email, address), social links, legal (privacy, terms), language switch, copyright.
 - Iran: eNamad seal + landline click-to-call + Telegram and Bale/Eitaa links (`iran-market.md` §8).
+- Design it as the page's close, not a link dump `[Opinion]`: the one main action again, real contact details and hours, then the legal links.
 
 ## 3. Motion and media restraint `[Proven]`
 - Motion guides attention or explains a state. It isn't decoration.
 - Only `transform` and `opacity`; 60fps on mid-range phones.
-- Scroll reveals: translate 8–16px + fade, 300–500ms, once, never on above-the-fold content (it delays perceived load).
+- Scroll reveals: translate 8–16px + fade, ~300ms, once, never on above-the-fold content (it delays perceived load); always behind the `html.js` gate (`components-and-states.md` §12 Motion baseline).
 - Respect `prefers-reduced-motion`.
 - WebGL/3D scenes: only for flagship launches, luxury or studio portfolios `[Emerging]`, with a lighter mobile fallback. For B2B and Persian consumer sites, clarity beats spectacle `[Hype when used on utility products]`.
 - Video: muted, `playsinline`, a poster image, play on user click or when visible. Hosted on a domestic platform for Iran.

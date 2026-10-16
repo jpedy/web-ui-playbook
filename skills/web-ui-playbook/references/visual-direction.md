@@ -10,7 +10,7 @@ Values not taken from the reports are general practice and marked as such.
 3. Dark mode
 4. Font pairing (English and Persian)
 5. Imagery, illustration, icons
-6. Anti-"AI slop" list
+6. Generic-page tells (→ anti-generic.md)
 
 ---
 
@@ -40,6 +40,20 @@ Radius: sm/md/lg. Density: control height and card padding. "Signature" is the o
 | 6 Editorial | white or paper `#FCFBF8`, near-black text, one link color | 0–6 | none | 65ch column, 18–20px body (EN) | almost none | strong headline hierarchy, pull quotes, reading-time badges |
 | 7 Bold Campaign | 1 strong brand color at large scale + black/white, high contrast | 0/8/24 (pick one) | none | huge type (display 56–72px+) | scroll reveals, ≤1 hero animation, reduced-motion fallback | one oversized number or headline; countdown only if the offer is real |
 | 8 Dark Developer | near-black bg (≈ `#08090A`–`#0B0F14`), `white/10` borders, one emerald/blue accent | 6/8/12 | borders + faint top glow | medium | 120–200ms | code snippet + rendered output side by side |
+
+### Default dials per direction (plain words — meaning in `anti-generic.md` §4)
+| Direction | Variance | Motion | Density |
+|---|---|---|---|
+| 1 Calm SaaS | balanced | subtle | balanced |
+| 2 Dense Pro Tool | calm | still | dense |
+| 3 Trust / Fintech | calm | subtle | balanced |
+| 4 Warm Consumer | balanced | subtle | airy |
+| 5 Playful EdTech | balanced | subtle (lively only on non-Iran audiences) | balanced |
+| 6 Editorial | bold (type) | still | airy |
+| 7 Bold Campaign | bold | lively | airy |
+| 8 Dark Developer | balanced | subtle | balanced |
+
+Write the chosen values into the user's `docs/design-commitment.md` (`anti-generic.md` §3).
 
 **Choosing when unsure:**
 - Persian consumer site → 3, 4 or 5.
@@ -108,18 +122,7 @@ All the fonts below are free (SIL OFL) and must be **self-hosted** (npm `@fontso
   - One set: Lucide, Heroicons, Tabler or Phosphor. Installed through npm and inlined as SVG, or via a Blade icon package.
   - No icon fonts from a CDN, and **no emoji as UI icons**.
   - Decorative icons get `aria-hidden="true"`; icon-only buttons get `aria-label`.
-- **Placeholders:** never ship lorem ipsum or "John Doe". Write realistic copy in the page's language (Persian copy for Persian pages — see the microcopy rules in `persian-rtl.md` §13).
+- **Placeholders:** never ship lorem ipsum or "John Doe". Write real copy in the page's language from what the owner told you (microcopy rules: `persian-rtl.md` §13); where a fact, number, quote or photo is missing, show a visible PLACEHOLDER — never an invented "realistic" one (`anti-generic.md` §2).
 
-## 6. Anti-"AI slop" list — remove on sight
-(Report B §8/§12 plus general practice.)
-- Purple-to-blue neon gradients, glowing orbs and generic "AI" sparkle icons with no reason.
-- Random radii (4px button inside a 24px card with no padding math), random spacing, 3+ shadow styles.
-- 45 hardcoded hex colors instead of tokens; gray-400 body text.
-- Emoji as icons; mixed icon sets.
-- Vague hero copy: "Unlock the power of…", "Revolutionize your workflow", "Learn More" ghost buttons. Say the concrete outcome: "English classes for adults, online, from ۱٬۹۰۰٬۰۰۰ تومان per month".
-- Fake social proof (made-up logos, "Trusted by 10,000+" without a source). Use real data or clearly mark placeholders for the user to fill.
-- Centered body paragraphs longer than 2 lines; centered table text.
-- Everything is a card in a card in a card.
-- Hero carousels and auto-playing background video.
-- Glassmorphism text on busy images without a solid tint (needs `rgba(255,255,255,.85)` or `rgba(0,0,0,.6)` behind it).
-- Identical three-column "feature" icons-and-text rows repeated three times down the page.
+## 6. Generic-page tells → `anti-generic.md`
+The anti-slop list moved to `anti-generic.md` §5 (one registry, merged with the taste-layer rules; `audit.mjs --slop` checks the objective ones). The short version: say the concrete outcome ("English classes for adults, online, from ۱٬۹۰۰٬۰۰۰ تومان per month", not "Unlock the power of…"), use only the owner's real proof, and give the page one signature detail from the client's own world.

@@ -4,6 +4,7 @@
  *
  * Usage:
  *   node audit.mjs <file-or-dir> [more...] [--iran] [--rtl] [--json] [--contrast [--css <file-or-dir>]]
+ *                  [--slop] [--render <built-page.html> [--render-root <public-dir>]]
  *
  *   --iran       users are inside Iran: foreign runtime hosts become errors everywhere
  *   --rtl        force Persian/RTL checks (auto-detected from lang="fa", dir="rtl" or Persian text)
@@ -13,6 +14,12 @@
  *                and Tailwind's default palette. Pairs it cannot determine (dynamic classes, Blade/JSX
  *                components, background images, unknown colors) are listed as "could not resolve" —
  *                never counted as passed. Small Persian text (< 14px) below 5.5:1 is a house-rule warning.
+ *   --slop       generic-page tells as warnings (data/fa-slop.json, data/en-slop.json; project overrides in
+ *                .slop-allow.json) and a list of every number claim and quote for the OWNER to confirm.
+ *                The audit cannot verify truth; passing it does not prove the page is good.
+ *   --render     open a built page in the installed Chrome/Edge (headless, local server, no network) and measure
+ *                real colors after JS/Alpine ran (light + dark), overflow and headline lines at 1440/768/375,
+ *                loaded fonts and Persian text under 13px. Resolves pairs --contrast could not. No browser → skipped.
  *
  * Exit code 1 when errors exist. Warnings need a human decision (fix, or explain why acceptable).
  * Suppress a line: put the text "audit-ignore" in a comment on that line or the line above.
@@ -20,14 +27,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { slopAudit, loadAllow } from './slop.mjs';
+import { renderAudit } from './render.mjs';
 
 const isMain = !!process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 const args = isMain ? process.argv.slice(2) : [];
 const flags = new Set(args.filter((a) => a.startsWith('--')));
-const cssArgs = args.flatMap((a, i) => (args[i - 1] === '--css' ? [a] : []));
-const targets = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--css');
+const VALUE_FLAGS = ['--css', '--render', '--render-root'];
+const valuesOf = (f) => args.flatMap((a, i) => (args[i - 1] === f ? [a] : []));
+const cssArgs = valuesOf('--css');
+const targets = args.filter((a, i) => !a.startsWith('--') && !VALUE_FLAGS.includes(args[i - 1]));
 if (isMain && !targets.length) {
-  console.log('Usage: node audit.mjs <file-or-dir> [...] [--iran] [--rtl] [--json] [--contrast [--css <file-or-dir>]]');
+  console.log('Usage: node audit.mjs <file-or-dir> [...] [--iran] [--rtl] [--json] [--contrast [--css <file-or-dir>]] [--slop] [--render <page.html> [--render-root <dir>]]');
   process.exit(2);
 }
 
@@ -97,6 +108,7 @@ const PHYSICAL = [
 ];
 
 // ---------- audit one file ----------
+const CLAIMS = [];
 function auditFile(file) {
   const raw = fs.readFileSync(file, 'utf8');
   const isCss = /\.css$/i.test(file);
@@ -240,7 +252,14 @@ function auditFile(file) {
     }
   }
 
-  // 6. Persian text hygiene (visible text only)
+  // 6. Generic-page tells + claims for the owner to confirm (--slop)
+  if (flags.has('--slop') && !isCss) {
+    const r = slopAudit({ file, raw, src, vis: visibleText(src), lineOf, ignored, allow: loadAllow(path.dirname(file)) });
+    findings.push(...r.findings);
+    CLAIMS.push(...r.claims);
+  }
+
+  // 7. Persian text hygiene (visible text only)
   if (rtl && !isCss) {
     const vis = visibleText(src);
     for (const m of vis.matchAll(/(^|[\s«(])(ن?می) (?=[؀-ۿ])/g))
@@ -620,11 +639,52 @@ const placeholders = files.flatMap((file) => fs.readFileSync(file, 'utf8').split
   .filter(Boolean));
 const contrast = flags.has('--contrast') ? runContrast(files) : null;
 if (contrast) all.push(...contrast.findings);
+
+// --render: what the browser really shows (built HTML pages)
+const normT = (t) => String(t).replace(/[\s‌]+/g, ' ').trim();
+const renders = [];
+for (const page of valuesOf('--render')) {
+  const r = await renderAudit(page, { root: valuesOf('--render-root')[0] });
+  const out = { page, status: r.status, reason: r.reason, browser: r.browser, checked: 0, pass: 0, fail: 0, house: 0, unresolved: [], hidden: 0, resolvedStatic: [] };
+  renders.push(out);
+  if (r.status !== 'ok') continue;
+  const seen = new Set();
+  const once = (f) => { const k = f.rule + f.msg; if (!seen.has(k)) { seen.add(k); all.push(f); } };
+  const firstW = r.runs[0]?.width;
+  for (const run of r.runs) {
+    const tag = `[${run.mode} ${run.width}px]`;
+    if (run.error) { once({ file: page, line: 0, sev: 'warn', rule: 'render', msg: `${tag} ${run.error}` }); continue; }
+    if (run.note) once({ file: page, line: 0, sev: 'warn', rule: 'render', msg: `${tag} ${run.note}` });
+    if (run.width === firstW) for (const t of run.texts) {
+      if (t.why === 'hidden') { out.hidden++; continue; }
+      out.checked++;
+      if (t.why) { out.unresolved.push({ mode: run.mode, text: t.text, el: t.el, msg: t.msg }); continue; }
+      const need = t.large ? 3 : 4.5, shown = (Math.floor(t.ratio * 100) / 100).toFixed(2);
+      if (t.ratio < need) { out.fail++; once({ file: page, line: 0, sev: 'error', rule: 'render-contrast', msg: `[${run.mode}] "${t.text}" <${t.el}> ${t.fg} on ${t.bg} = ${shown}:1 in the browser — needs ${need}:1.` }); }
+      else if (t.fa && t.px < 14 && t.ratio < 5.5) { out.house++; once({ file: page, line: 0, sev: 'warn', rule: 'render-fa-contrast', msg: `[${run.mode}] small Persian text "${t.text}" ${t.fg} on ${t.bg} = ${shown}:1 — house rule ≥ 5.5:1 under 14px.` }); }
+      else out.pass++;
+    }
+    if (run.mode !== 'light') continue;
+    if (run.overflow > 1) once({ file: page, line: 0, sev: 'warn', rule: 'render-overflow', msg: `${tag} page scrolls sideways by ${run.overflow}px.` });
+    for (const h of run.headlines) if (h.tag === 'h1' && h.lines > (run.width < 768 ? 3 : 2)) once({ file: page, line: 0, sev: 'warn', rule: 'render-headline', msg: `${tag} <h1> "${h.text}" wraps to ${h.lines} lines — keep it to ${run.width < 768 ? 3 : 2} (shorten it, not the font).` });
+    for (const t of run.texts) if (!t.why && t.fa && t.px < 13) once({ file: page, line: 0, sev: 'warn', rule: 'render-small-fa', msg: `Persian text "${t.text}" renders at ${t.px}px — house rule ≥ 13px.` });
+    if (!run.bodyFontLoaded && !/^(serif|sans-serif|system-ui|monospace|ui-sans-serif|ui-serif|-apple-system)$/i.test(run.bodyFont)) once({ file: page, line: 0, sev: 'warn', rule: 'render-font', msg: `body font "${run.bodyFont}" did not load (fonts loaded: ${run.fonts.join(', ') || 'none'}) — check the @font-face URLs.` });
+    if (run.external.length) once({ file: page, line: 0, sev: flags.has('--iran') ? 'error' : 'warn', rule: 'render-external', msg: `the page tried to load from other hosts (blocked during the test): ${[...new Set(run.external)].join(', ')}.` });
+  }
+  if (contrast) for (const u of contrast.unresolved) {
+    const run = r.runs.find((x) => x.mode === u.mode && x.width === firstW && x.texts);
+    const hit = run && run.texts.find((t) => !t.why && (normT(t.text).startsWith(normT(u.text).slice(0, 18)) || normT(u.text).startsWith(normT(t.text).slice(0, 18))));
+    if (!hit) continue;
+    // a dynamic class is only measured if the framework that sets it really ran in the rendered page
+    if (u.why === 'dynamic' && !run.alpine && !run.livewire) { out.notApplied = (out.notApplied || 0) + 1; continue; }
+    out.resolvedStatic.push({ ...u, ratio: hit.ratio, ok: hit.ratio >= (hit.large ? 3 : 4.5) });
+  }
+}
 const errors = all.filter((f) => f.sev === 'error').length;
 const warns = all.length - errors;
 
 if (flags.has('--json')) {
-  console.log(JSON.stringify({ files: files.length, errors, warnings: warns, findings: all, placeholders, ...(contrast ? { contrast: { cssFiles: contrast.cssFiles, checked: contrast.checked, unresolved: contrast.unresolved } } : {}) }, null, 2));
+  console.log(JSON.stringify({ files: files.length, errors, warnings: warns, findings: all, placeholders, ...(flags.has('--slop') ? { claims: CLAIMS } : {}), ...(contrast ? { contrast: { cssFiles: contrast.cssFiles, checked: contrast.checked, unresolved: contrast.unresolved } } : {}), ...(renders.length ? { render: renders } : {}) }, null, 2));
 } else {
   const byFile = new Map();
   for (const f of all) { if (!byFile.has(f.file)) byFile.set(f.file, []); byFile.get(f.file).push(f); }
@@ -648,6 +708,20 @@ if (flags.has('--json')) {
       if (un.length > 15) console.log(`  … ${un.length - 15} more (use --json for the full list)`);
     }
     console.log(`Contrast: ${contrast.checked} text check(s) · ${contrast.checked - fails - house - un.length} pass · ${fails} fail · ${house} below the Persian 5.5:1 house rule · ${un.length} could not resolve (${by('dynamic')} dynamic classes, ${by('component')} components, ${by('image')} background images, ${by('unknown')} unknown colors, ${by('page')} unknown page colors)`);
+  }
+  for (const r of renders) {
+    if (r.status !== 'ok') { console.log(`\nRender ${r.page}: skipped — ${r.reason}. Unresolved pairs stay unresolved (not passed).`); continue; }
+    console.log(`\nRender ${r.page} (${path.basename(r.browser)}, local server, network blocked): ${r.checked} text check(s) · ${r.pass} pass · ${r.fail} fail · ${r.house} below the Persian 5.5:1 house rule · ${r.unresolved.length} could not resolve (NOT passed) · ${r.hidden} not visible (not checked)`);
+    for (const u of r.unresolved.slice(0, 10)) console.log(`  [${u.mode}] "${u.text}" <${u.el}> — ${u.msg}`);
+    if (contrast && contrast.unresolved.length) {
+      const bad = r.resolvedStatic.filter((x) => !x.ok).length;
+      console.log(`Static "could not resolve" pairs measured in the browser: ${r.resolvedStatic.length} of ${contrast.unresolved.length} (${r.resolvedStatic.length - bad} pass, ${bad} fail; only the state shown on load); ${contrast.unresolved.length - r.resolvedStatic.length} still unresolved — check those by eye${r.notApplied ? ` (${r.notApplied} use dynamic classes but no Alpine/Livewire ran in the rendered page, so their state was never applied)` : ''}.`);
+    }
+  }
+  if (flags.has('--slop')) {
+    console.log(`\nClaims to confirm with the owner (${CLAIMS.length}) — every number claim, superlative and quote. The audit cannot verify them; a source comment is not proof:`);
+    for (const c of CLAIMS) console.log(`  ${c.file}:${c.line}  [${c.kind}${c.placeholder ? ', PLACEHOLDER' : ''}] ${c.text}`);
+    console.log('Passing --slop does not prove the page is good — do the by-eye passes in review-checklist.md §F, including "substance".');
   }
   console.log(`\n${files.length} file(s) scanned · ${errors} error(s) · ${warns} warning(s)`);
   if (!files.length) console.log('No .html/.blade.php/.jsx/.tsx/.vue/.css files found.');

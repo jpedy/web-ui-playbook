@@ -1,0 +1,26 @@
+{
+  "$comment": "English generic-copy lists for audit.mjs --slop (lang=\"en\" pages and English parts of bilingual pages). Warnings only. Matching is case-insensitive on visible text; same skips as fa-slop.json.",
+  "version": 1,
+  "date": "2026-10-16",
+  "reviewedBy": "not owner-reviewed — adapted from taste-skill @ f624f37 references/copy.md L156–157 and scripts/lint.mjs L48–49 (MIT, see THIRD_PARTY_NOTICES.md)",
+  "filler": [
+    { "pattern": "\\b(unlock|unleash|supercharge|elevate|empower|revolutioni[sz]e|streamline)s?\\b", "why": "genre verb that says nothing concrete; use the real action" },
+    { "pattern": "\\b(seamless(ly)?|effortless(ly)?|cutting[- ]edge|next[- ]gen(eration)?|world[- ]class|game[- ]chang(er|ing)|best[- ]in[- ]class)\\b", "why": "genre adjective; say what is actually better" },
+    { "phrase": "all-in-one", "why": "vague; list what is included" },
+    { "phrase": "in today's fast-paced world", "why": "stock opener" },
+    { "pattern": "\\bwelcome to (the )?(world|future) of\\b", "why": "stock welcome line" }
+  ],
+  "claims": [
+    { "pattern": "\\b(the )?(best|#1|number one|leading)\\b", "where": "prominent", "why": "superlative claim — needs proof the owner confirms" },
+    { "pattern": "\\bguarantee(d)?\\b", "why": "guarantee claim — the owner must confirm the terms" }
+  ],
+  "buttons": [
+    { "label": "learn more", "when": "always", "why": "says nothing about the target" },
+    { "label": "get started", "when": "always", "why": "start what? name the first step" },
+    { "label": "click here", "when": "always", "why": "describes the mouse, not the action (WCAG 2.4.4)" },
+    { "label": "read more", "when": "link-to-page", "why": "link label without the article's name (WCAG 2.4.4)" },
+    { "label": "see more", "when": "link-to-page", "why": "fine for an in-place expand; as a link it hides the destination" },
+    { "label": "discover more", "when": "always", "why": "says nothing about the target" },
+    { "label": "submit", "when": "main-cta", "why": "fine as a form's submit button; as a main call to action it hides what happens" }
+  ]
+}

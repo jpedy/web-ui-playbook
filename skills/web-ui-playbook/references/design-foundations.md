@@ -44,7 +44,7 @@ Sources: reports A (general UI/UX) and B (modern web design), plus general pract
 | Body | `clamp(1rem, 0.95rem + 0.25vw, 1.125rem)` (16→18px) | 1.5–1.6 | 400 | line length 60–75ch (`max-w-prose` ≈ 65ch) |
 | Lead/subheadline | 18–20px | 1.5 | 400 | 55–65ch |
 | UI controls | 14px (13px in dense apps) | 1.4 | 500 | |
-| Caption/meta | 12–13px | 1.4 | 400–500 | never below 12px |
+| Caption/meta | 12–13px | 1.4 | 400–500 | never below 12px; **Persian ≥ 13px** (`text-caption`, house rule) |
 | Table header | 12px | 1.4 | 600 | letter-spacing 0.04em in Latin only; no uppercase in Persian |
 
 - Use at most 2 font families: one sans for UI/body, plus an optional display or serif. A monospace font only for code or IDs.
