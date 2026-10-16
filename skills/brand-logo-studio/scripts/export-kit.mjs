@@ -19,7 +19,7 @@ if (!get('brief') || !get('direction')) { console.log('Usage: node export-kit.mj
 const brief = loadBrief(get('brief'));
 const out = outDir(get('out'));
 const res = await exportKit(brief, get('direction'), out);
-console.log(`wrote  ${res.files.length + 1} files to ${out}  (direction ${res.dir.id}: ${res.dir.title})`);
+console.log(`wrote  ${res.files.length} files to ${out}  (direction ${res.dir.id}: ${res.dir.title})`);
 if (res.proof) {
   console.log(`proof  ${res.proof.file}  · browser comparison ${res.proof.chrome.status}${res.proof.chrome.score ? ` (${(res.proof.chrome.score * 100).toFixed(1)}%)` : res.proof.chrome.reason ? ` — ${res.proof.chrome.reason}` : ''}`);
   for (const c of res.proof.checks.filter((x) => !x.ok)) console.log(`  ⚠ ${c.ch} ${c.name}: ${c.detected}/${c.expected} dots — check by eye`);

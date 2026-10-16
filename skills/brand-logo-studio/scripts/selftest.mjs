@@ -135,6 +135,9 @@ const kit = await exportKit(fx, 'C', tmp);
 const need = ['svg/logo-h-rtl.svg', 'svg/logo-fa-only.svg', 'svg/logo-icon.svg', 'svg/logo-mono-black.svg', 'favicon.svg', 'favicon.ico', 'png/apple-touch-icon.png',
   'png/icon-maskable-512.png', 'png/og-image.png', 'site.webmanifest', 'head-snippet.blade.php', 'brand-sheet.png', 'proof/proof-wordmark.png', 'kit-report.md'];
 for (const f of need) check(fs.existsSync(path.join(tmp, f)), `kit has ${f}`);
+check(kit.files.length === new Set(kit.files).size && kit.files.length === fs.readdirSync(tmp, { recursive: true }).filter((f) => fs.statSync(path.join(tmp, f)).isFile()).length, `kit file list matches the files written (${kit.files.length})`);
+const favRes = await validateSvg(fs.readFileSync(path.join(tmp, 'favicon.svg'), 'utf8'), { kind: 'light', allowStyle: true });
+check(!favRes.some((f) => f.level !== 'ok'), 'adaptive favicon.svg validates clean (variants checked separately)');
 check(!kit.findings.some((f) => f.level === 'FAIL'), `kit has no blocking findings: ${kit.findings.filter((f) => f.level === 'FAIL').map((f) => f.msg).join('; ')}`);
 check(decodePng(fs.readFileSync(path.join(tmp, 'png/apple-touch-icon.png'))).pixels[3] === 255, 'apple-touch-icon is opaque');
 const kitIco = fs.readFileSync(path.join(tmp, 'favicon.ico'));

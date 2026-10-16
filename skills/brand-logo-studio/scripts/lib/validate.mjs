@@ -80,8 +80,10 @@ export async function validateSvg(svg, opts = {}) {
   if (elements > 300) add('WARN', 'complexity', `${elements} shapes — simplify; complex logos fail at small sizes.`);
   const out = await clipping(svg);
   add(out ? 'FAIL' : 'ok', 'clipping', out ? `${out} pixels of ink fall outside the viewBox (clipped when displayed).` : 'nothing outside the viewBox');
+  const adaptive = /prefers-color-scheme/.test(svg);
+  if (adaptive) add('ok', 'contrast', 'adaptive favicon: light and dark variants are checked as logo-icon.svg and logo-icon-reversed.svg');
   const bg = opts.kind === 'reversed' || opts.kind === 'mono-white' ? opts.darkBg || '#0b1220' : opts.lightBg || '#ffffff';
-  for (const p of paints(svg)) {
+  if (!adaptive) for (const p of paints(svg)) {
     if (!hexToRgb(p) || p === bg) continue;
     const cr = contrast(p, bg);
     if (cr < 3) add('WARN', 'contrast', `${p} is ${cr.toFixed(2)}:1 on ${bg} (logo shapes need ≥ 3:1, WCAG 1.4.11) — acceptable only for a small detail beside darker shapes.`);

@@ -147,9 +147,8 @@ export async function exportKit(brief, dirId, out) {
   if (brief.name.fa) { proof = await proofSheet(brief.name.fa, brief.fonts.fa, path.join(proofDir, 'proof-wordmark.png')); files.push('proof/proof-wordmark.png'); }
   await brandSheet(brief, path.join(out, 'brand-sheet.png'), { primary, reversed, icon });
   files.push('brand-sheet.png');
-  files.push('kit-report.md');
-  write(path.join(out, 'kit-report.md'), kitReport(brief, dir, files, findings, [...warnings], proof));
-  files.pop();
+  const report = kitReport(brief, dir, [...files, 'kit-report.md'], findings, [...warnings], proof);
+  write(path.join(out, 'kit-report.md'), report);
   return { files, findings, warnings: [...warnings], proof, dir };
 }
 
