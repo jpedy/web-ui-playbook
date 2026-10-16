@@ -16,7 +16,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { normalize } from './slop.mjs';
-import { findChrome } from './render.mjs';
+import { findChrome, renderAudit } from './render.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const AUDIT = path.join(DIR, 'audit.mjs'), FX = path.join(DIR, 'fixtures');
@@ -75,8 +75,11 @@ if (chrome) {
   check(r?.status === 'ok', `render: ran in ${path.basename(chrome)}`);
   check(/رنگ این متن بعد از اجرای اسکریپت/.test(errs), 'render: catches a low-contrast color applied by JS after load');
   check(/فقط در فریم انیمیشن/.test(errs), 'render: sees content shown inside requestAnimationFrame (Alpine x-show style)');
+  check(/بخش پایین صفحه/.test(errs), 'render: reveal-on-scroll content below the fold (IntersectionObserver + CSS transition) is measured');
   check(r?.unresolved.some((u) => /گرادیان/.test(u.text)) && !/گرادیان/.test(errs), 'render: text on a gradient stays "could not resolve" — never passed');
   check((rr.findings || []).some((f) => f.rule === 'render-external' && /example\.com/.test(f.msg)), 'render: a request to another host is blocked and reported');
+  const vp = await renderAudit(rfile, { widths: [375, 1440], modes: ['light'] });
+  check(vp.runs.every((x) => x.viewport && x.viewport[0] === x.width), `render: measures at the exact viewport width (headless Chrome alone would lay out 375 as 500): ${vp.runs.map((x) => x.viewport?.[0]).join(', ')}`);
   check(r?.pass + r?.fail + r?.house + r?.unresolved.length === r?.checked, 'render: every checked text is pass, fail or unresolved');
 } else console.log('(no Chrome/Edge found: --render checks not run)');
 const sk = audit([rfile, '--render', rfile], { CHROME_PATH: 'none' });

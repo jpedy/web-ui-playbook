@@ -10,6 +10,11 @@
  * The page is served from a local server on 127.0.0.1 with a measuring script injected; Chrome is started
  * with every other host mapped to nowhere and a dead proxy, so nothing leaves the machine. Scripts get a
  * virtual-time budget, so Alpine x-data/:class and timers run before measuring.
+ * Each run frames the page in an iframe of exactly width × height: headless Chrome never lays a window out
+ * narrower than 500px, so a plain 375px window would really measure 500px. Headless --dump-dom also produces
+ * no rendering frames, so three measurement shims are injected first: rAF runs on timers (Alpine x-show),
+ * IntersectionObserver reports every element as visible (reveal-on-scroll, x-intersect), and transitions/
+ * animations are off (elements show their end state). Only the state shown after load is measured.
  * No Chrome → { status: 'skipped' }: nothing is downloaded and nothing is counted as passed.
  */
 import fs from 'node:fs';
@@ -38,10 +43,13 @@ export function findChrome() {
 }
 
 // The measuring script injected into the page (runs after load + a delay, inside Chrome's virtual time).
-// Pre-script, first thing in <head>: headless --dump-dom never produces animation frames, so rAF-driven updates
-// (Alpine x-show, many libraries) would never run. Route rAF through timers, which virtual time does advance.
-const PRE = `<script>(function(){var q=new URLSearchParams(location.search);if(q.get('__audit_mode')==='dark')document.documentElement.classList.add('dark');
-window.requestAnimationFrame=function(cb){return setTimeout(function(){cb(performance.now());},16);};window.cancelAnimationFrame=function(id){clearTimeout(id);};})();</script>`;
+// Pre-script, first thing in <head>: headless --dump-dom never produces rendering frames, so rAF callbacks (Alpine x-show)
+// and IntersectionObserver (reveal-on-scroll, Alpine x-intersect) never fire. Measurement shims: rAF runs on timers, and
+// every observed element is reported as intersecting — the page as a visitor sees it after scrolling through once.
+// CSS transitions/animations don't advance without frames either, so they are switched off: elements show their end state.
+const PRE = `<style id="__audit_static">*,*::before,*::after{transition:none!important;animation:none!important}html{scrollbar-width:none}</style><script>(function(){var q=new URLSearchParams(location.search);if(q.get('__audit_mode')==='dark')document.documentElement.classList.add('dark');
+window.requestAnimationFrame=function(cb){return setTimeout(function(){cb(performance.now());},16);};window.cancelAnimationFrame=function(id){clearTimeout(id);};
+window.IntersectionObserver=function(cb){var self=this;this.observe=function(el){setTimeout(function(){var r=el.getBoundingClientRect();cb([{target:el,isIntersecting:true,intersectionRatio:1,boundingClientRect:r,intersectionRect:r,rootBounds:null,time:performance.now()}],self);},50);};this.unobserve=function(){};this.disconnect=function(){};this.takeRecords=function(){return[];};};})();</script>`;
 const PROBE = (waitMs) => `<script>(function(){
 function rgba(c){var v=document.createElement('canvas');v.width=v.height=1;var x=v.getContext('2d');x.fillStyle='rgba(0,0,0,0)';x.fillStyle=c;x.clearRect(0,0,1,1);x.fillRect(0,0,1,1);var d=x.getImageData(0,0,1,1).data;return[d[0],d[1],d[2],d[3]/255];}
 function over(a,b){var al=a[3]+b[3]*(1-a[3]);if(!al)return[0,0,0,0];return[0,1,2].map(function(i){return(a[i]*a[3]+b[i]*b[3]*(1-a[3]))/al}).concat(al);}
@@ -50,7 +58,7 @@ function ratio(a,b){var x=lum(a),y=lum(b);return(Math.max(x,y)+0.05)/(Math.min(x
 function hex(c){return'#'+c.slice(0,3).map(function(v){return Math.round(v).toString(16).padStart(2,'0')}).join('');}
 function name(el){return el.tagName.toLowerCase()+(el.id?'#'+el.id:'')+(typeof el.className==='string'&&el.className.trim()?'.'+el.className.trim().split(/\\s+/).slice(0,3).join('.'):'');}
 function measure(){
- var out={note:window.__note||null,texts:[],headlines:[],overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,fonts:[],alpine:window.Alpine?(window.Alpine.version||'yes'):null,livewire:!!window.Livewire,external:[]};
+ var out={note:window.__note||null,texts:[],headlines:[],overflow:document.documentElement.scrollWidth-innerWidth,fonts:[],alpine:window.Alpine?(window.Alpine.version||'yes'):null,livewire:!!window.Livewire,external:[]};
  var page=rgba(getComputedStyle(document.documentElement).backgroundColor);if(page[3]<1)page=over(page,rgba(getComputedStyle(document.body).backgroundColor));if(page[3]<1)page=over(page,[255,255,255,1]);
  document.querySelectorAll('body *').forEach(function(el){
   if(el.closest('script,style,svg,noscript,template')||el.id==='__audit_result')return;
@@ -73,13 +81,15 @@ function measure(){
  document.fonts.forEach(function(f){if(f.status==='loaded')out.fonts.push(f.family.replace(/["']/g,'')+' '+f.weight);});
  out.bodyFont=fam;out.bodyFontLoaded=out.fonts.some(function(x){return x.indexOf(fam+' ')===0;});
  performance.getEntriesByType('resource').forEach(function(e){try{var u=new URL(e.name);if(u.hostname!=='127.0.0.1')out.external.push(u.host+u.pathname.slice(0,40));}catch(_){}});
- var s=document.createElement('script');s.type='application/json';s.id='__audit_result';s.textContent=JSON.stringify(out).replace(/</g,'\\\\u003c');document.body.appendChild(s);
+ out.viewport=[innerWidth,innerHeight];var json=JSON.stringify(out).replace(/</g,'\\\\u003c');
+ if(window.parent!==window){window.parent.postMessage({__audit:json},'*');return;}
+ var s=document.createElement('script');s.type='application/json';s.id='__audit_result';s.textContent=json;document.body.appendChild(s);
 }
-// measure when the page is quiet: fonts loaded, then no DOM change for 1 s (Alpine/Livewire done), min waitMs, max 8 s
+// measure when the page is quiet: fonts loaded, then no DOM change for 1 s (Alpine/Livewire done), min waitMs, max 12 s
 window.addEventListener('load',function(){var t0=Date.now(),last=Date.now(),done=false;
  new MutationObserver(function(){last=Date.now();}).observe(document.documentElement,{subtree:true,childList:true,attributes:true,characterData:true});
  function finish(note){if(done)return;done=true;window.__note=note;measure();}
- function tick(){if(done)return;var now=Date.now();if(now-t0>8000){finish('timed out waiting for the page to settle');return;}
+ function tick(){if(done)return;var now=Date.now();if(now-t0>12000){finish('timed out waiting for the page to settle');return;}
   if(now-t0>=${waitMs}&&now-last>=1000){var seen=last,fallback=setTimeout(function(){finish('no animation frames — rAF-driven updates (e.g. Alpine x-show) may be missing');},3000);
    requestAnimationFrame(function(){requestAnimationFrame(function(){clearTimeout(fallback);if(last===seen)finish(null);else setTimeout(tick,200);});});}
   else setTimeout(tick,200);}
@@ -93,6 +103,12 @@ function serve(root, pageRel, waitMs) {
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
       const u = new URL(req.url, 'http://127.0.0.1');
+      if (u.pathname === '/__audit_frame.html') { // wrapper: frames the page at exactly w × h (its own viewport)
+        const w = Number(u.searchParams.get('w')), h = Number(u.searchParams.get('h')), mode = u.searchParams.get('mode');
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+        res.end(`<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:#fff}iframe{border:0;display:block}</style><iframe width="${w}" height="${h}" src="/${pageRel}?__audit_mode=${mode}"></iframe><script>addEventListener('message',function(e){if(e.data&&e.data.__audit){var s=document.createElement('script');s.type='application/json';s.id='__audit_result';s.textContent=e.data.__audit;document.body.appendChild(s);}});</script>`);
+        return;
+      }
       const rel = decodeURIComponent(u.pathname).replace(/^\/+/, '');
       const file = path.resolve(root, rel || pageRel);
       if (!file.startsWith(path.resolve(root)) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); res.end(); return; }
@@ -112,7 +128,7 @@ function serve(root, pageRel, waitMs) {
 function dumpDom(chrome, url, width, height, dark) {
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'wup-render-'));
   const args = ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--disable-background-networking', `--user-data-dir=${profile}`,
-    `--window-size=${width},${height}`, '--hide-scrollbars', '--virtual-time-budget=10000', '--run-all-compositor-stages-before-draw',
+    `--window-size=${width},${height}`, '--hide-scrollbars', '--virtual-time-budget=16000', '--run-all-compositor-stages-before-draw',
     '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1', '--proxy-server=http://127.0.0.1:9', '--proxy-bypass-list=127.0.0.1',
     `--blink-settings=preferredColorScheme=${dark ? 0 : 1}`, '--dump-dom', url];
   return new Promise((resolve) => {
@@ -142,7 +158,9 @@ export async function renderAudit(htmlFile, opts = {}) {
     const widths = opts.widths || [1440, 768, 375], modes = opts.modes || ['light', 'dark'];
     for (const mode of modes) for (const width of widths) {
       if (mode === 'dark' && width !== widths[0]) continue; // colors: once per mode; layout: every width in light
-      const { out, err } = await dumpDom(chrome, `http://127.0.0.1:${port}/${pageRel}?__audit_mode=${mode}`, width, width < 768 ? 812 : 1000, mode === 'dark');
+      // the page is framed at exactly width × height: headless Chrome never lays a window out narrower than 500px
+      const height = width < 768 ? 812 : 900;
+      const { out, err } = await dumpDom(chrome, `http://127.0.0.1:${port}/__audit_frame.html?w=${width}&h=${height}&mode=${mode}`, Math.max(600, width + 40), height + 120, mode === 'dark');
       const m = out.match(/<script type="application\/json" id="__audit_result">([\s\S]*?)<\/script>/);
       if (!m) { runs.push({ width, mode, error: `no measurement came back (${(err || 'empty DOM').split('\n').filter(Boolean).slice(-1)[0] || 'timeout'})` }); continue; }
       runs.push({ width, mode, ...JSON.parse(m[1]) });

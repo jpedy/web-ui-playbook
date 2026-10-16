@@ -1,16 +1,18 @@
 <!doctype html>
 <!-- Fixture for audit.mjs --render (scripts/selftest.mjs). Colors change only after JS runs:
      #late gets a low-contrast class from a timer, #raf appears only in a requestAnimationFrame callback
-     (the way Alpine's x-show works), .hero text sits on a gradient (must stay unresolved), and an image
+     (the way Alpine's x-show works), a section far below the fold is revealed by IntersectionObserver + a CSS
+     transition (must still be measured), .hero text sits on a gradient (must stay unresolved), and an image
      points at a foreign host (must be blocked and reported). Plain JS — no framework needed. -->
 <html lang="fa" dir="rtl">
 <head>
-<meta charset="utf-8"><title>render fixture</title>
+<meta charset="utf-8"><script>document.documentElement.classList.add('js')</script><title>render fixture</title>
 <style>
   :root { --bg: #ffffff; --text: #111827; } .dark { --bg: #0b1220; --text: #f3f4f6; }
   body { margin: 0; background: var(--bg); color: var(--text); font-family: sans-serif; }
   .faint { color: #cbd5e1; } .hidden { display: none; } .chip { background: #fde68a; color: #fef3c7; }
   .hero { background-image: linear-gradient(#0d9488, #115e59); color: #fff; }
+  .js [data-reveal] { opacity: 0; transition: opacity .3s ease-out; } .js [data-reveal].is-in { opacity: 1; } .pale { color: #d1d5db; }
 </style>
 </head>
 <body>
@@ -18,9 +20,12 @@
   <p id="late">رنگ این متن بعد از اجرای اسکریپت کم‌رنگ می‌شود</p>
   <span id="raf" class="chip hidden">فقط در فریم انیمیشن ظاهر می‌شود</span>
   <section class="hero"><p>متن روی گرادیان</p></section>
+  <div style="height: 2400px"></div>
+  <section data-reveal><p class="pale">بخش پایین صفحه که با اسکرول ظاهر می‌شود</p></section>
   <img src="https://example.com/pixel.png" alt="" width="1" height="1">
   <script>
     setTimeout(function () { document.getElementById('late').className = 'faint'; }, 300);
+    new IntersectionObserver(function (es, io) { es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('is-in'); io.unobserve(e.target); } }); }).observe(document.querySelector('[data-reveal]'));
     setTimeout(function () { requestAnimationFrame(function () { document.getElementById('raf').classList.remove('hidden'); }); }, 400);
   </script>
 </body>
