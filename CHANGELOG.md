@@ -13,6 +13,8 @@
 - **`audit.mjs --render`** — the built page in the installed Chrome/Edge (headless, local server, network blocked, exact viewport sizes): contrast after Alpine/JS ran, overflow and headline lines at 1440/768/375, fonts loaded, blocked requests. Skips cleanly without a browser.
 - Review checklist §F: slop audit + seven by-eye passes ending with a "substance" pass.
 - Motion baseline (html.js gate, reveal once, reduced motion keeps fades, no scroll hijacking); RTL motion and scrolling notes; Persian text ≥ 13px (`text-caption` token).
+- **`audit.mjs --release`** — pre-launch gate: PLACEHOLDER markers, `[ … ]` placeholder text, fake sample data and example phone numbers outside input hints are errors (warnings without the flag).
+- **No-JS view** in `--render`: the page with JavaScript off; reports text hidden or empty without JS (the html.js gate rule). `--render`'s own measurement adjustments (timer frames, reveal-as-scrolled, transitions off) show an end state and do not apply to this view.
 - `scripts/selftest.mjs` for all fixtures.
 
 ### Bug fixes

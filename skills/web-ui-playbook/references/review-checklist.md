@@ -88,7 +88,8 @@ Only check the sections that apply: A and F always; B for English/LTR; C for any
 **[auto] `--slop`** (warnings — fix, or keep and say why):
 - [ ] Generic copy and buttons (`slop-filler`, `slop-cta`, `slop-link-purpose`), layout tells (`slop-cards`, `slop-repeat-sections`, `slop-pill-badge`, `slop-blob`, `slop-glass`, `slop-gradient-text`), motion hygiene (`slop-motion`, `slop-reveal-gate`), small Persian text (`slop-small-fa`), emoji, lorem, placeholder image hosts, fake seals.
 - [ ] **Claims to confirm:** every number, superlative and quote the audit lists goes into the report for the owner — including ones marked PLACEHOLDER. None may be invented; a source comment is not proof.
-- [ ] `--render` (optional): browser contrast after JS ran, overflow and headline lines at 1440/768/375, fonts loaded, no request left the machine. Pairs it could not resolve stay unresolved — check by eye.
+- [ ] `--render` (optional): browser contrast after JS ran, overflow and headline lines at 1440/768/375, fonts loaded, no request left the machine. Pairs it could not resolve stay unresolved — check by eye. Its measurement adjustments show the **end state** of reveals; the separate **no-JS view** must report 0 `nojs-hidden` / `nojs-empty`.
+- [ ] **Before launch:** `--release` exits 0 — no PLACEHOLDER, no `[ … ]` placeholder text, no sample data, no example phone numbers (format hints inside inputs are fine).
 
 **By eye — seven passes, at most two rounds of fixes** (adapted from taste-skill `skills/taste-skill/references/critique.md` passes 1–4, 9, 10, 12 — L21–30, L46–48, L55; the other seven passes are covered by sections A–C or rejected):
 1. **One second** — glance and look away: one thing should stay with you (the offer or the signature detail).

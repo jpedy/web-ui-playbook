@@ -186,7 +186,8 @@ Hover must never be the only way to reveal something: touch has no hover `[Prove
 2. **Reveal once.** Add `is-in` the first time the element enters the viewport, never again on scroll back (Alpine: `x-intersect.once="$el.classList.add('is-in')"`; plain JS: `IntersectionObserver` + `unobserve`). Not on body text inside articles.
 3. **Reduced motion keeps fades** — it removes movement, not feedback (the `reduce` rule above keeps a short opacity fade); state feedback (hover, focus, pressed) stays.
 4. **No scroll hijacking:** no smooth-scroll/inertia libraries, no scroll-jacked horizontal pans, no custom cursors. A pinned story is CSS `position: sticky`.
-5. Hygiene: transform/opacity only, 150–300ms, ease-out for entering; never `transition-all`, `ease-in` or `scale(0)` entrances (`audit.mjs --slop` warns). RTL directions: `persian-rtl.md` §11.
+5. **Check it:** `audit.mjs … --render page.html` opens the page with JavaScript off too and lists any text hidden or empty without JS (`nojs-hidden`, `nojs-empty`).
+6. Hygiene: transform/opacity only, 150–300ms, ease-out for entering; never `transition-all`, `ease-in` or `scale(0)` entrances (`audit.mjs --slop` warns). RTL directions: `persian-rtl.md` §11.
 
 ## 13. Common mistakes
 - Two or more solid primary buttons competing in one section.

@@ -64,10 +64,13 @@ All output goes into your project (`--out`); the scripts refuse to write into th
 - **`--contrast`** — every text element against its background in light and dark, from your tokens. Pairs it cannot determine (dynamic classes, components, background images) are listed as "could not resolve" and **never counted as passed**.
 - **`--slop`** — generic-page tells as warnings (stock phrases and generic buttons from `scripts/data/fa-slop.json`, layout and motion habits), and the list of claims for you to confirm. Allow a phrase or rule in your project with `.slop-allow.json`.
 - **`--render <page.html>`** — opens a built page in your installed Chrome/Edge (headless, local server, network blocked) and measures what the browser really shows after Alpine/JS ran: contrast in light and dark, overflow and headline lines at 1440 / 768 / 375 px, fonts that loaded, requests that tried to leave the machine. Blade must be rendered to HTML first (save the page Laravel serves).
+  - **Measurement adjustments show an end state.** Headless Chrome renders no frames, so before measuring `--render` routes `requestAnimationFrame` through timers, reports every element as scrolled into view and switches transitions/animations off. Results describe the page *after* every reveal — not what a visitor sees mid-animation.
+  - **No-JS view (separate).** The same run also opens the page with JavaScript **off** (sandboxed frame, none of the adjustments above apart from transitions off) and reports text that is visible with JS but hidden without it (`nojs-hidden` — an ungated hide-before-reveal) and content that only JavaScript fills in (`nojs-empty` — empty `x-text`, `<template x-for>`).
+- **`--release`** — the pre-launch gate: every PLACEHOLDER marker, visible placeholder text (`[ … ]`), fake sample data (lorem, «شرکت نمونه», example.com, placeholder images, seals without a verification link) and example phone number outside an input hint is an **error**, listed by file and line; no-JS findings become errors too. Without `--release`, fake data and example phones are warnings and placeholders are listed.
 
 ### Self-tests
 ```bash
-node skills/web-ui-playbook/scripts/selftest.mjs      # audit fixtures, --slop, --render (53 checks; 45 without a browser)
+node skills/web-ui-playbook/scripts/selftest.mjs      # audit fixtures, --slop, --release, --render, no-JS view (62 checks; 51 without a browser)
 node skills/brand-color-system/scripts/selftest.mjs   # color math, palettes, contrast (3850 checks)
 node skills/brand-logo-studio/scripts/selftest.mjs    # shaping, bidi, validators, kit export (154 checks; 146 without a browser)
 ```
@@ -81,7 +84,7 @@ node skills/brand-logo-studio/scripts/selftest.mjs    # shaping, bidi, validator
 
 ## Known limitations
 - macOS and Linux browser paths are implemented but were **not tested**.
-- `--render` measures the state shown after load (first tab, closed menus). To make headless Chrome finish reveals it routes `requestAnimationFrame` through timers, reports every element as scrolled into view and switches transitions off — real visitors may see in-between states.
+- `--render` measures the state shown after load (first tab, closed menus) and, because of its measurement adjustments, the end state of every reveal — real visitors may see in-between states. Whether content survives without JavaScript is the separate no-JS view.
 - `--slop` and `--contrast` read source files statically; they cannot verify truth, judge substance or see components rendered elsewhere.
 - brand-logo-studio's bidi handling is for one-line logo strings; calligraphic logotypes (Nastaliq, Shekasteh), mascots and illustrations need a human designer.
 - Legal notes about Iranian trademark registration and copyright are dated (Oct 2026), US-centered for copyright, and **not legal advice — verify with an IP attorney**.

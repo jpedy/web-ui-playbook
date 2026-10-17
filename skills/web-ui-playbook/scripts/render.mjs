@@ -57,6 +57,7 @@ function lum(c){return[0,1,2].map(function(i){var v=c[i]/255;return v<=0.04045?v
 function ratio(a,b){var x=lum(a),y=lum(b);return(Math.max(x,y)+0.05)/(Math.min(x,y)+0.05);}
 function hex(c){return'#'+c.slice(0,3).map(function(v){return Math.round(v).toString(16).padStart(2,'0')}).join('');}
 function name(el){return el.tagName.toLowerCase()+(el.id?'#'+el.id:'')+(typeof el.className==='string'&&el.className.trim()?'.'+el.className.trim().split(/\\s+/).slice(0,3).join('.'):'');}
+function pathOf(el){var p=[];while(el&&el.nodeType===1&&el!==document.body){var i=1,s=el;while((s=s.previousElementSibling))i++;p.unshift(el.tagName.toLowerCase()+':'+i);el=el.parentElement;}return p.join('>');}
 function measure(){
  var out={note:window.__note||null,texts:[],headlines:[],overflow:document.documentElement.scrollWidth-innerWidth,fonts:[],alpine:window.Alpine?(window.Alpine.version||'yes'):null,livewire:!!window.Livewire,external:[]};
  var page=rgba(getComputedStyle(document.documentElement).backgroundColor);if(page[3]<1)page=over(page,rgba(getComputedStyle(document.body).backgroundColor));if(page[3]<1)page=over(page,[255,255,255,1]);
@@ -64,7 +65,7 @@ function measure(){
   if(el.closest('script,style,svg,noscript,template')||el.id==='__audit_result')return;
   var own='';el.childNodes.forEach(function(n){if(n.nodeType===3)own+=n.textContent;});own=own.replace(/\\s+/g,' ').trim();if(!own)return;
   var cs=getComputedStyle(el),r=el.getBoundingClientRect();
-  var rec={text:own.slice(0,40),el:name(el),px:parseFloat(cs.fontSize),weight:parseInt(cs.fontWeight,10)||400,fa:/[\\u0600-\\u06FF]/.test(own)};
+  var rec={text:own.slice(0,40),el:name(el),path:pathOf(el),px:parseFloat(cs.fontSize),weight:parseInt(cs.fontWeight,10)||400,fa:/[\\u0600-\\u06FF]/.test(own)};
   if(!r.width||!r.height||cs.visibility==='hidden'||cs.display==='none'){rec.why='hidden';rec.msg='not visible (display:'+cs.display+')';out.texts.push(rec);return;}
   var op=1,n=el;while(n&&n.nodeType===1){op*=parseFloat(getComputedStyle(n).opacity);n=n.parentElement;}
   if(op<0.05){rec.why='hidden';out.texts.push(rec);return;}
@@ -96,6 +97,28 @@ window.addEventListener('load',function(){var t0=Date.now(),last=Date.now(),done
  (document.fonts&&document.fonts.ready?document.fonts.ready:Promise.resolve()).then(function(){setTimeout(tick,200);});});
 })();</script>`;
 
+// The no-JS view: the page in an iframe sandboxed WITHOUT allow-scripts (its JavaScript never runs), measured from the
+// wrapper. None of the measurement shims apply here; only CSS transitions/animations are switched off, so a pure-CSS
+// animation cannot leave text stuck at its first frame (headless Chrome renders no frames).
+const NOJS_WRAPPER = (w, h, src) => `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:#fff}iframe{border:0;display:block}</style><iframe sandbox="allow-same-origin" width="${w}" height="${h}" src="${src}"></iframe><script>
+var f=document.querySelector('iframe');
+function name(el){return el.tagName.toLowerCase()+(el.id?'#'+el.id:'')+(typeof el.className==='string'&&el.className.trim()?'.'+el.className.trim().split(/\\s+/).slice(0,3).join('.'):'');}
+f.addEventListener('load',function(){setTimeout(function(){
+ var d=f.contentDocument,w=f.contentWindow,out={texts:[],empty:[],viewport:[d.documentElement.clientWidth,d.documentElement.clientHeight]};
+ function pathOf(el){var p=[];while(el&&el.nodeType===1&&el!==d.body){var i=1,s=el;while((s=s.previousElementSibling))i++;p.unshift(el.tagName.toLowerCase()+':'+i);el=el.parentElement;}return p.join('>');}
+ d.querySelectorAll('body *').forEach(function(el){
+  if(el.closest('script,style,svg,template,noscript'))return;
+  var own='';el.childNodes.forEach(function(n){if(n.nodeType===3)own+=n.textContent;});own=own.replace(/\\s+/g,' ').trim();if(!own)return;
+  var cs=w.getComputedStyle(el),r=el.getBoundingClientRect(),op=1,n=el;while(n&&n.nodeType===1){op*=parseFloat(w.getComputedStyle(n).opacity);n=n.parentElement;}
+  var why=cs.display==='none'?'display:none':cs.visibility==='hidden'?'visibility:hidden':op<0.05?'opacity '+op.toFixed(2):(!r.width||!r.height)?'zero size':null;
+  out.texts.push({path:pathOf(el),text:own.slice(0,40),el:name(el),why:why});
+ });
+ d.querySelectorAll('[x-text],[x-html],[v-text],[v-html],[data-bind]').forEach(function(el){if(!el.textContent.trim()){var a=['x-text','x-html','v-text','v-html','data-bind'].find(function(k){return el.hasAttribute(k)});out.empty.push({el:name(el),why:a+'="'+el.getAttribute(a)+'" is empty until JavaScript runs'});}});
+ d.querySelectorAll('template[x-for],template[x-if]').forEach(function(t){var a=t.hasAttribute('x-for')?'x-for':'x-if';out.empty.push({el:'template',why:a+'="'+t.getAttribute(a)+'" renders nothing without JavaScript'});});
+ var s=document.createElement('script');s.type='application/json';s.id='__audit_result';s.textContent=JSON.stringify(out).replace(/</g,'\\\\u003c');document.body.appendChild(s);
+},1500);});
+</script>`;
+
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.avif': 'image/avif', '.gif': 'image/gif', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf' };
 
 /** Serve `root` on 127.0.0.1 (random port); the page `pageRel` gets the probe injected. */
@@ -109,13 +132,24 @@ function serve(root, pageRel, waitMs) {
         res.end(`<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:#fff}iframe{border:0;display:block}</style><iframe width="${w}" height="${h}" src="/${pageRel}?__audit_mode=${mode}"></iframe><script>addEventListener('message',function(e){if(e.data&&e.data.__audit){var s=document.createElement('script');s.type='application/json';s.id='__audit_result';s.textContent=e.data.__audit;document.body.appendChild(s);}});</script>`);
         return;
       }
+      if (u.pathname === '/__audit_nojs.html') {
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+        res.end(NOJS_WRAPPER(Number(u.searchParams.get('w')), Number(u.searchParams.get('h')), `/${pageRel}?__audit_nojs=1`));
+        return;
+      }
       const rel = decodeURIComponent(u.pathname).replace(/^\/+/, '');
       const file = path.resolve(root, rel || pageRel);
       if (!file.startsWith(path.resolve(root)) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); res.end(); return; }
       let body = fs.readFileSync(file);
       if (path.resolve(file) === path.resolve(root, pageRel)) {
         const html = body.toString('utf8');
-        const withPre = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (h) => h + PRE) : PRE + html;
+        if (u.searchParams.has('__audit_nojs')) { // no-JS view: static CSS only (see NOJS_WRAPPER)
+          const style = '<style id="__audit_static">*,*::before,*::after{transition:none!important;animation:none!important}html{scrollbar-width:none}</style>';
+          res.writeHead(200, { 'content-type': TYPES['.html'], 'cache-control': 'no-store' });
+          res.end(/<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (h) => h + style) : style + html);
+          return;
+        }
+        const withPre =/<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (h) => h + PRE) : PRE + html;
         body = Buffer.from(/<\/body>/i.test(withPre) ? withPre.replace(/<\/body>/i, `${PROBE(waitMs)}</body>`) : withPre + PROBE(waitMs));
       }
       res.writeHead(200, { 'content-type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream', 'cache-control': 'no-store' });
@@ -165,6 +199,22 @@ export async function renderAudit(htmlFile, opts = {}) {
       if (!m) { runs.push({ width, mode, error: `no measurement came back (${(err || 'empty DOM').split('\n').filter(Boolean).slice(-1)[0] || 'timeout'})` }); continue; }
       runs.push({ width, mode, ...JSON.parse(m[1]) });
     }
+    // no-JS view at the first width: what a visitor sees when JavaScript fails or is blocked
+    let nojs = null;
+    if (opts.nojs !== false) {
+      const width = widths[0], height = width < 768 ? 812 : 900;
+      const { out, err } = await dumpDom(chrome, `http://127.0.0.1:${port}/__audit_nojs.html?w=${width}&h=${height}`, Math.max(600, width + 40), height + 120, false);
+      const m = out.match(/<script type="application\/json" id="__audit_result">([\s\S]*?)<\/script>/);
+      if (!m) nojs = { width, error: `no measurement came back (${(err || 'empty DOM').split('\n').filter(Boolean).slice(-1)[0] || 'timeout'})` };
+      else {
+        const r = JSON.parse(m[1]);
+        const withJs = runs.find((x) => x.mode === 'light' && x.width === width && x.texts);
+        const visibleWithJs = new Set((withJs?.texts || []).filter((t) => t.why !== 'hidden').map((t) => t.path));
+        nojs = { width, viewport: r.viewport, checked: r.texts.length,
+          hidden: r.texts.filter((t) => t.why && visibleWithJs.has(t.path)), // visible with JS, hidden without it
+          empty: r.empty };
+      }
+    }
+    return { status: 'ok', browser: chrome, root, page: pageRel, runs, nojs };
   } finally { server.close(); }
-  return { status: 'ok', browser: chrome, root, page: pageRel, runs };
 }

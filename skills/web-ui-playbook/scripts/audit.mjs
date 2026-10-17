@@ -4,7 +4,7 @@
  *
  * Usage:
  *   node audit.mjs <file-or-dir> [more...] [--iran] [--rtl] [--json] [--contrast [--css <file-or-dir>]]
- *                  [--slop] [--render <built-page.html> [--render-root <public-dir>]]
+ *                  [--slop] [--render <built-page.html> [--render-root <public-dir>]] [--release]
  *
  *   --iran       users are inside Iran: foreign runtime hosts become errors everywhere
  *   --rtl        force Persian/RTL checks (auto-detected from lang="fa", dir="rtl" or Persian text)
@@ -20,6 +20,9 @@
  *   --render     open a built page in the installed Chrome/Edge (headless, local server, no network) and measure
  *                real colors after JS/Alpine ran (light + dark), overflow and headline lines at 1440/768/375,
  *                loaded fonts and Persian text under 13px. Resolves pairs --contrast could not. No browser → skipped.
+ *                Also opens the page with JavaScript off and reports content that is hidden or empty without JS.
+ *   --release    pre-launch gate: every PLACEHOLDER marker, visible placeholder text, fake sample data and example
+ *                phone number outside an input hint is an ERROR (without --release: fake data and example phones warn).
  *
  * Exit code 1 when errors exist. Warnings need a human decision (fix, or explain why acceptable).
  * Suppress a line: put the text "audit-ignore" in a comment on that line or the line above.
@@ -29,6 +32,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { slopAudit, loadAllow } from './slop.mjs';
 import { renderAudit } from './render.mjs';
+import { releaseChecks } from './release.mjs';
 
 const isMain = !!process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 const args = isMain ? process.argv.slice(2) : [];
@@ -38,7 +42,7 @@ const valuesOf = (f) => args.flatMap((a, i) => (args[i - 1] === f ? [a] : []));
 const cssArgs = valuesOf('--css');
 const targets = args.filter((a, i) => !a.startsWith('--') && !VALUE_FLAGS.includes(args[i - 1]));
 if (isMain && !targets.length) {
-  console.log('Usage: node audit.mjs <file-or-dir> [...] [--iran] [--rtl] [--json] [--contrast [--css <file-or-dir>]] [--slop] [--render <page.html> [--render-root <dir>]]');
+  console.log('Usage: node audit.mjs <file-or-dir> [...] [--iran] [--rtl] [--json] [--contrast [--css <file-or-dir>]] [--slop] [--render <page.html> [--render-root <dir>]] [--release]');
   process.exit(2);
 }
 
@@ -259,7 +263,10 @@ function auditFile(file) {
     CLAIMS.push(...r.claims);
   }
 
-  // 7. Persian text hygiene (visible text only)
+  // 7. Release gate: placeholders, fake sample data, example phone numbers (errors with --release)
+  if (!isCss) findings.push(...releaseChecks({ file, raw, src, vis: visibleText(src), lineOf, ignored, release: flags.has('--release') }));
+
+  // 8. Persian text hygiene (visible text only)
   if (rtl && !isCss) {
     const vis = visibleText(src);
     for (const m of vis.matchAll(/(^|[\s«(])(ن?می) (?=[؀-ۿ])/g))
@@ -671,6 +678,14 @@ for (const page of valuesOf('--render')) {
     if (!run.bodyFontLoaded && !/^(serif|sans-serif|system-ui|monospace|ui-sans-serif|ui-serif|-apple-system)$/i.test(run.bodyFont)) once({ file: page, line: 0, sev: 'warn', rule: 'render-font', msg: `body font "${run.bodyFont}" did not load (fonts loaded: ${run.fonts.join(', ') || 'none'}) — check the @font-face URLs.` });
     if (run.external.length) once({ file: page, line: 0, sev: flags.has('--iran') ? 'error' : 'warn', rule: 'render-external', msg: `the page tried to load from other hosts (blocked during the test): ${[...new Set(run.external)].join(', ')}.` });
   }
+  // no-JS view (JavaScript off; no measurement shims): content that disappears or stays empty without JS
+  if (r.nojs) {
+    const sev = flags.has('--release') ? 'error' : 'warn';
+    out.nojs = { checked: r.nojs.checked || 0, hidden: (r.nojs.hidden || []).length, empty: (r.nojs.empty || []).length, error: r.nojs.error };
+    if (r.nojs.error) once({ file: page, line: 0, sev: 'warn', rule: 'nojs', msg: `no-JS view: ${r.nojs.error}` });
+    for (const t of r.nojs.hidden || []) once({ file: page, line: 0, sev, rule: 'nojs-hidden', msg: `without JavaScript "${t.text}" <${t.el}> is hidden (${t.why}) but visible with it — gate hide-before-reveal styles behind html.js (components-and-states.md §12).` });
+    for (const e of r.nojs.empty || []) once({ file: page, line: 0, sev, rule: 'nojs-empty', msg: `without JavaScript <${e.el}> ${e.why} — put the real content in the HTML and let JavaScript enhance it.` });
+  }
   if (contrast) for (const u of contrast.unresolved) {
     const run = r.runs.find((x) => x.mode === u.mode && x.width === firstW && x.texts);
     const hit = run && run.texts.find((t) => !t.why && (normT(t.text).startsWith(normT(u.text).slice(0, 18)) || normT(u.text).startsWith(normT(t.text).slice(0, 18))));
@@ -713,6 +728,7 @@ if (flags.has('--json')) {
     if (r.status !== 'ok') { console.log(`\nRender ${r.page}: skipped — ${r.reason}. Unresolved pairs stay unresolved (not passed).`); continue; }
     console.log(`\nRender ${r.page} (${path.basename(r.browser)}, local server, network blocked): ${r.checked} text check(s) · ${r.pass} pass · ${r.fail} fail · ${r.house} below the Persian 5.5:1 house rule · ${r.unresolved.length} could not resolve (NOT passed) · ${r.hidden} not visible (not checked)`);
     for (const u of r.unresolved.slice(0, 10)) console.log(`  [${u.mode}] "${u.text}" <${u.el}> — ${u.msg}`);
+    if (r.nojs) console.log(r.nojs.error ? `No-JS view: ${r.nojs.error}` : `No-JS view (JavaScript off, no measurement shims): ${r.nojs.checked} text element(s) · ${r.nojs.hidden} hidden that are visible with JS · ${r.nojs.empty} empty until JS runs`);
     if (contrast && contrast.unresolved.length) {
       const bad = r.resolvedStatic.filter((x) => !x.ok).length;
       console.log(`Static "could not resolve" pairs measured in the browser: ${r.resolvedStatic.length} of ${contrast.unresolved.length} (${r.resolvedStatic.length - bad} pass, ${bad} fail; only the state shown on load); ${contrast.unresolved.length - r.resolvedStatic.length} still unresolved — check those by eye${r.notApplied ? ` (${r.notApplied} use dynamic classes but no Alpine/Livewire ran in the rendered page, so their state was never applied)` : ''}.`);

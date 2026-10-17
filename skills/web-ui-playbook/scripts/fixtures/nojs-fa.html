@@ -1,0 +1,26 @@
+<!doctype html>
+<!-- Fixture for audit.mjs --render no-JS view (scripts/selftest.mjs).
+     .ungated is hidden by CSS until JS adds .in — without JS it stays hidden (must be reported);
+     .gated is hidden only under html.js — without JS it is visible (must NOT be reported);
+     #name is filled by x-text and the list by <template x-for> — both empty without JS (must be reported). -->
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8"><title>no-JS fixture</title>
+<script>document.documentElement.classList.add('js')</script>
+<style>
+  body { margin: 0; font-family: sans-serif; color: #111827; background: #fff; }
+  .ungated { opacity: 0; } .ungated.in { opacity: 1; }
+  .js .gated { opacity: 0; } .js .gated.in { opacity: 1; }
+</style>
+</head>
+<body>
+  <h1>آزمون بدون جاوااسکریپت</h1>
+  <p class="ungated">این بند بدون جاوااسکریپت دیده نمی‌شود</p>
+  <p class="gated">این بند با دروازهٔ html.js امن است</p>
+  <div x-data="{ name: 'زبان‌سرا', items: ['یک', 'دو'] }">
+    <span id="name" x-text="name"></span>
+    <ul><template x-for="i in items"><li x-text="i"></li></template></ul>
+  </div>
+  <script>document.querySelectorAll('.ungated,.gated').forEach(function (el) { el.classList.add('in'); });</script>
+</body>
+</html>

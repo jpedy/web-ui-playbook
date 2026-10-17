@@ -65,6 +65,15 @@ fs.rmSync(proj, { recursive: true, force: true });
 const n = (s) => normalize(s).text;
 check(n('تأیید') === n('تایید') && n('ثبت‌نام') === n('ثبت نام') && n('ي ك') === 'ی ک' && n('۳٣3') === '333' && n('زبـــان') === 'زبان' && n('سَلام') === 'سلام', 'normalization: hamza, ZWNJ = space, Arabic letters, digits, tatweel, diacritics');
 
+// 3b. --release gate
+const relFile = path.join(FX, 'release-fa.blade.php'), relHead = fs.readFileSync(relFile, 'utf8');
+const expRel = JSON.parse(relHead.match(/expected-release: ({.*})/)[1]), expNorm = JSON.parse(relHead.match(/expected-normal: ({.*})/)[1]);
+const rel = audit([relFile, '--release']), nor = audit([relFile]);
+const rc = count(rel, 'release-'), nc = count(nor, 'release-');
+for (const k of Object.keys(expRel)) check(rc[k] === expRel[k] && (rel.findings || []).filter((f) => f.rule === k).every((f) => f.sev === 'error'), `--release: ${k} ${expRel[k]} errors (got ${rc[k] || 0})`);
+for (const k of new Set([...Object.keys(expNorm), ...Object.keys(nc)])) check((nc[k] || 0) === (expNorm[k] || 0) && (nor.findings || []).filter((f) => f.rule === k).every((f) => f.sev === 'warn'), `normal mode: ${k} ${expNorm[k] || 0} warnings (got ${nc[k] || 0})`);
+check(rel.status === 1 && !(rel.findings || []).some((f) => /۰۹۱۲ ۱۲۳ ۴۵۶۷/.test(f.msg)), '--release exits 1; the input placeholder hint «۰۹۱۲ ۱۲۳ ۴۵۶۷» is allowed');
+
 // 4. render
 const chrome = findChrome();
 const rfile = path.join(FX, 'render-fa.html');
@@ -81,6 +90,11 @@ if (chrome) {
   const vp = await renderAudit(rfile, { widths: [375, 1440], modes: ['light'] });
   check(vp.runs.every((x) => x.viewport && x.viewport[0] === x.width), `render: measures at the exact viewport width (headless Chrome alone would lay out 375 as 500): ${vp.runs.map((x) => x.viewport?.[0]).join(', ')}`);
   check(r?.pass + r?.fail + r?.house + r?.unresolved.length === r?.checked, 'render: every checked text is pass, fail or unresolved');
+  const nj = audit([path.join(FX, 'nojs-fa.html'), '--render', path.join(FX, 'nojs-fa.html')]);
+  const njm = (nj.findings || []).filter((f) => f.rule.startsWith('nojs')).map((f) => f.msg).join('\n');
+  check(/این بند بدون جاوااسکریپت دیده نمی‌شود/.test(njm), 'no-JS view: an ungated hide-before-reveal is reported');
+  check(!/دروازهٔ html.js امن است/.test(njm), 'no-JS view: content hidden only under html.js is not reported');
+  check(/x-text="name"/.test(njm) && /x-for=/.test(njm), 'no-JS view: x-text and <template x-for> content that needs JavaScript is reported');
 } else console.log('(no Chrome/Edge found: --render checks not run)');
 const sk = audit([rfile, '--render', rfile], { CHROME_PATH: 'none' });
 check(sk.render?.[0].status === 'skipped' && !(sk.findings || []).some((f) => f.rule.startsWith('render')), 'no browser → render "skipped", nothing passed, nothing downloaded');
