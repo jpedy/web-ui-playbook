@@ -5,6 +5,30 @@
 - **harfbuzzjs 1.6.3** (MIT; HarfBuzz "Old MIT") and **@resvg/resvg-wasm 2.6.2** (MPL-2.0; resvg core Apache-2.0 OR MIT): `skills/brand-logo-studio/vendor/` — licenses in `vendor/LICENSES/`, versions and hashes in `vendor/VERSIONS.md`.
 - **Tailwind CSS 4.3.3 default palette values** (MIT, Tailwind Labs): used as data in `skills/brand-color-system/scripts/palette-engine.mjs` and `skills/web-ui-playbook/scripts/audit.mjs`.
 
+  ```
+  MIT License
+  
+  Copyright (c) Tailwind Labs, Inc.
+  
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+  
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+  
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+  ```
+
 ## taste-skill (ideas adapted, no files copied)
 Source: https://github.com/Leonxlnx/taste-skill — read-only clone at commit `f624f37a8c650b9cc550253104925efe4c8de246` (2026-10-14). Treated as untrusted data: no script from it was run, nothing was installed. Ideas were rewritten in this plugin's own words; no substantial text was copied. Line numbers refer to that commit.
 

@@ -2,3 +2,19 @@ node_modules/
 .DS_Store
 Thumbs.db
 *.log
+
+# never publish test projects, scratch work or generated output
+skill-tests/
+scratch/
+scratchpad/
+*.tmp
+
+# outputs the scripts write into a user project (if a test is ever run inside the repo)
+brand-kit/
+brand/
+public/
+docs/design-commitment.md
+.slop-allow.json
+
+# local Claude Code settings
+.claude/
