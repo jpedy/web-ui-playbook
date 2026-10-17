@@ -1,12 +1,29 @@
 {
   "name": "web-ui-playbook",
-  "description": "Self-contained UI/UX playbook skill: professional websites, landing pages, dashboards and forms for non-designers. Tuned for Laravel + Tailwind CSS v4 and Persian/RTL interfaces for users inside Iran (Vazirmatn, Persian digits, ZWNJ, Jalali, Toman, SMS-OTP, Shaparak/eNamad, no foreign CDNs). Asks intake questions, picks a style and real reference sites, sets design tokens first, builds, then audits and fixes its own output.",
-  "version": "1.0.0",
+  "description": "Self-contained UI/UX plugin for non-designers: three skills — web-ui-playbook (websites, landing pages, dashboards and forms with a design commitment, tokens first, and a self-audit for contrast, generic-page tells and real browser rendering), brand-color-system (brand palettes with WCAG-checked light/dark tokens) and brand-logo-studio (logos, favicons and brand kits with correct Persian shaping). Tuned for Laravel + Tailwind CSS v4 and Persian/RTL interfaces for users inside Iran (Vazirmatn, Persian digits, ZWNJ, Jalali, Toman, SMS-OTP, Shaparak/eNamad, no foreign CDNs).",
+  "version": "1.1.0",
   "author": {
     "name": "jpedy"
   },
   "homepage": "https://github.com/jpedy/web-ui-playbook",
   "repository": "https://github.com/jpedy/web-ui-playbook",
   "license": "MIT",
-  "keywords": ["ui", "ux", "design", "tailwind", "laravel", "rtl", "persian", "farsi", "iran", "accessibility", "design-tokens"]
+  "keywords": [
+    "ui",
+    "ux",
+    "design",
+    "tailwind",
+    "laravel",
+    "rtl",
+    "persian",
+    "farsi",
+    "iran",
+    "accessibility",
+    "design-tokens",
+    "color-palette",
+    "logo",
+    "brand-kit",
+    "favicon",
+    "wcag"
+  ]
 }
