@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — branch v3-multistack (becomes 1.2.0)
+## 1.2.0 — 2026-10-19
 
 ### Changed — deliberate behavior change
 - **`audit.mjs`: Iran rules now follow the market, not the language.** A Persian page audited without an Iran market gets `foreign-host` **warnings** (privacy/speed) instead of errors. Projects whose market is Iran — `"market": "iran"` in `.web-ui-playbook.json`, or `--iran` / `--market iran` — still get **errors**. Persian language rules (RTL, digits, ZWNJ, typography) are unchanged and still follow the text. Selftest: `selftest.mjs` §3c.

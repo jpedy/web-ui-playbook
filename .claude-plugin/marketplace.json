@@ -4,15 +4,15 @@
     "name": "jpedy"
   },
   "metadata": {
-    "description": "UI/UX, brand color and logo skills for Laravel + Tailwind and Persian/RTL web interfaces",
-    "version": "1.1.0"
+    "description": "UI/UX, brand color and logo skills for Laravel, Next.js, WordPress and static sites, with Persian/RTL and Iran-market rules",
+    "version": "1.2.0"
   },
   "plugins": [
     {
       "name": "web-ui-playbook",
       "source": "./",
       "description": "Self-contained UI/UX plugin: design direction, tokens, components, page patterns, Persian/RTL and Iran rules, a taste layer against generic pages, a self-audit (contrast, slop, real browser render), brand palettes (brand-color-system) and logos/brand kits (brand-logo-studio).",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "author": {
         "name": "jpedy"
       },
@@ -24,6 +24,8 @@
         "design",
         "tailwind",
         "laravel",
+        "wordpress",
+        "nextjs",
         "rtl",
         "persian",
         "iran",
