@@ -1,0 +1,19 @@
+<!doctype html>
+<!-- Fixture: plain-CSS static site (selftest §3f). Expected: texts styled by CSS rules are "could not resolve (css-rule)"
+     statically and measured by --render; /work/case is a clean URL (warning), /missing is a broken link (error);
+     the 18px-tall nav link is reported as a small tap target at 375px. -->
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fixture studio</title>
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+  <header><a class="tiny" href="/work/case">Work</a> <a href="/missing">Old page</a></header>
+  <main>
+    <h1>Signs people can read</h1>
+    <p class="faint">This grey text is too light on white.</p>
+    <p>Body text in the default color.</p>
+  </main>
+</body>
+</html>

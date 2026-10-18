@@ -31,5 +31,5 @@ for (const [key, list] of grouped) { const [level, id, msg] = key.split('|'); co
        in ${list.join(', ')}`); }
 for (const d of res.decisions) console.log(`auto   ${d}`);
 for (const w of res.warnings) console.log(`note   ${w}`);
-console.log('Read kit-report.md, then open proof/proof-wordmark.png and brand-sheet.png — the final check is by eye.');
+console.log(`Read kit-report.md, then open ${res.proof ? 'proof/proof-wordmark.png and ' : ''}brand-sheet.png — the final check is by eye.`);
 process.exit(res.findings.some((f) => f.level === 'FAIL') ? 1 : 0);

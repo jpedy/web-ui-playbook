@@ -158,6 +158,13 @@ if (fs.existsSync(auditPath)) {
   const fake = { tokens: { light: { danger: '#ff6b6b' }, dark: { danger: '#b91c1c' } } };
   const sc = shadcnChecks(fake);
   check(sc.length === 1 && sc[0].mode === 'light' && /white text on --destructive/.test(sc[0].pair), 'shadcn: white text on a too-light --destructive is reported (the palette matrix does not check that pair)');
+  const cv = run(['--format', 'css-variables', '--out', path.join(proj, 'v')]);
+  const cvFile = path.join(proj, 'v', 'palette.vars.css');
+  const cvCss = fs.existsSync(cvFile) ? fs.readFileSync(cvFile, 'utf8') : '';
+  const cvCheck = spawnSync(process.execPath, [path.join(DIR, 'check-contrast.mjs'), cvFile, '--json'], { encoding: 'utf8' });
+  const cvRes = JSON.parse(cvCheck.stdout || '{"results":[]}');
+  check(cv.status === 0 && !fs.existsSync(path.join(proj, 'v', 'palette.css')) && !/@theme/.test(cvCss) && /@media \(prefers-color-scheme: dark\)/.test(cvCss) && /\.dark, \[data-theme="dark"\]/.test(cvCss), '--format css-variables: plain CSS (no @theme), dark from the system setting and from .dark / data-theme');
+  check(cvRes.results.length >= 40 && cvRes.results.every((r) => r.pass !== false) && new Set(cvRes.results.map((r) => r.mode)).size === 2, `css-variables: check-contrast reads it independently — ${cvRes.results.length} pairs, light and dark, all pass`);
   const bad = run(['--format', 'nope', '--out', path.join(proj, 'x')]);
   check(bad.status === 2 && /available: /.test(bad.stderr) && !fs.existsSync(path.join(proj, 'x')), 'an unknown --format is refused (with the list) before anything is written');
   if (fs.existsSync(path.join(DIR, '..', '..', 'web-ui-playbook', 'scripts', 'profile.mjs'))) {

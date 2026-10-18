@@ -22,7 +22,7 @@
  *   --market <m>             iran: also warn when the brand is close to a well-known Iranian brand
  *                            (data: references/iran-brand-colors.md, dated — verify) · global: no market table
  *   --format <list>          token files to write, comma-separated (default tailwind4): tailwind4 (palette.css),
- *                            shadcn (palette.shadcn.css — shadcn/ui variable names)
+ *                            css-variables (palette.vars.css — plain CSS), shadcn (palette.shadcn.css — shadcn/ui names)
  *                            — formats per stack: web-ui-playbook references/stacks/<stack>.md
  *   Without --lang / --market, the project's .web-ui-playbook.json (web-ui-playbook profile) supplies them.
  *   --competitor "<hex>[:Name]"   extra competitor color (repeatable)

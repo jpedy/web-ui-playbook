@@ -218,6 +218,20 @@ function auditFile(file) {
     }
     for (const m of src.matchAll(/<iframe\b[^>]*>/gi)) if (!/\btitle\s*=/.test(m[0])) add('warn', 'iframe-title', m.index, '<iframe> without title.');
 
+    // static sites: internal links must point to a file that exists (no server rewrites them)
+    if (S.stack === 'static' && P.name === 'html') {
+      const siteRoot = S.profile ? path.dirname(S.profile) : process.cwd();
+      const isFile = (p) => fs.existsSync(p) && fs.statSync(p).isFile();
+      for (const m of src.matchAll(/<a\b[^>]*\bhref\s*=\s*["']([^"'#?]*)(?:[?#][^"']*)?["']/gi)) {
+        const href = m[1];
+        if (!href || /^[a-z][\w+.-]*:|^\/\//i.test(href) || href.includes('[')) continue; // same page, other schemes, placeholders
+        const abs = href.startsWith('/') ? path.join(siteRoot, href) : path.resolve(path.dirname(file), href);
+        if (isFile(abs) || isFile(path.join(abs, 'index.html'))) continue;
+        if (isFile(`${abs.replace(/[\\/]+$/, '')}.html`)) add('warn', 'clean-url', m.index, `Link "${href}" works only on hosts that add ".html" themselves — link to "${href.replace(/\/+$/, '')}.html" or move the page to ${href.replace(/\/+$/, '')}/index.html.`);
+        else add('error', 'broken-link', m.index, `Link "${href}" points to a page that does not exist in the site folder.`);
+      }
+    }
+
     // icon-only buttons / links
     for (const m of src.matchAll(/<(button|a)\b([^>]*)>([\s\S]*?)<\/\1>/gi)) {
       const attrs = m[2];
@@ -369,8 +383,12 @@ function cssInImportOrder(files) {
 /** Tokens from CSS files: light (:root, html, @theme) and dark (.dark, [data-theme=dark], prefers-color-scheme: dark). */
 function loadTheme(cssFiles) {
   const vars = { light: {}, dark: {} };
+  const cssColorClasses = new Set(); // classes whose own CSS rules set text or background colors (plain-CSS sites)
   for (const f of cssFiles) {
     for (const b of cssBlocks(fs.readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, ''))) {
+      const sel = b.context[b.context.length - 1] || '';
+      if (/(^|[;\s{])(color|background(-color)?)\s*:/.test(b.body) && !/^@/.test(sel))
+        for (const part of sel.split(',')) if (!/:(hover|focus|active|visited|focus-visible|focus-within|disabled|checked)|::/.test(part)) for (const m of part.matchAll(/\.([A-Za-z_][\w-]*)/g)) if (!['dark', 'light', 'js', 'no-js'].includes(m[1])) cssColorClasses.add(m[1]);
       const dark = b.context.some((s) => /\.dark\b|data-theme\s*=\s*["']?dark|prefers-color-scheme:\s*dark/.test(s));
       const light = !dark && /^(:root|html|:host)\b|^@theme/.test(b.context[b.context.length - 1]);
       if (!dark && !light) continue;
@@ -408,7 +426,7 @@ function loadTheme(cssFiles) {
   };
   const sizes = {};
   for (const [k, v] of Object.entries(vars.light)) { const m = k.match(/^--text-([\w-]+)$/); if (m && !m[1].includes('--') && !Number.isNaN(toPx(v))) sizes[m[1]] = toPx(v); }
-  return { named, resolveValue, token, sizes, hasDark: Object.keys(vars.dark).length > 0 };
+  return { named, resolveValue, token, sizes, cssColorClasses, hasDark: Object.keys(vars.dark).length > 0 };
 }
 
 const SIZE_PX = { xs: 12, sm: 14, base: 16, lg: 18, xl: 20, '2xl': 24, '3xl': 30, '4xl': 36, '5xl': 48, '6xl': 60, '7xl': 72, '8xl': 96, '9xl': 128 };
@@ -495,6 +513,8 @@ function evalText(stack, mode, R, page) {
     const el = stack[j];
     if (el.dynamic) return { why: 'dynamic', msg: `dynamic classes on <${el.tag}> (line ${el.line})` };
     if (el.component) return { why: 'component', msg: `inside component <${el.tag}> (line ${el.line}) — its colors are set elsewhere` };
+    const cssClass = el.classes.find((c) => R.cssColorClasses.has(c));
+    if (cssClass) return { why: 'css', msg: `colors set by the CSS rule .${cssClass} on <${el.tag}> (line ${el.line}) — measured by --render` };
     const st = styleOf(el, mode, R);
     if (size == null && st.size) size = st.size;
     if (weight == null && st.weight) weight = st.weight;
@@ -528,7 +548,7 @@ function evalText(stack, mode, R, page) {
 }
 
 /** Fixed reason codes for texts the static contrast check cannot resolve (never counted as passed). */
-const REASON = { dynamic: 'dynamic-class', component: 'component', image: 'gradient-or-image-bg', unknown: 'unknown-color', page: 'unknown-page-color' };
+const REASON = { dynamic: 'dynamic-class', component: 'component', css: 'css-rule', image: 'gradient-or-image-bg', unknown: 'unknown-color', page: 'unknown-page-color' };
 
 /** Contrast audit of one page file. Returns { findings, checked, unresolved: [{file, line, mode, why, msg, text}] }. */
 function contrastFile(file, R, layoutBody) {
@@ -667,6 +687,12 @@ for (const { target, sub } of renderTargets) {
     for (const h of run.headlines) if (h.tag === 'h1' && h.lines > (run.width < 768 ? 3 : 2)) once({ file: page, line: 0, sev: 'warn', rule: 'render-headline', msg: `${tag} <h1> "${h.text}" wraps to ${h.lines} lines — keep it to ${run.width < 768 ? 3 : 2} (shorten it, not the font).` });
     for (const t of run.texts) if (!t.why && t.fa && t.px < 13) once({ file: page, line: 0, sev: 'warn', rule: 'render-small-fa', msg: `Persian text "${t.text}" renders at ${t.px}px — house rule ≥ 13px.` });
     if (!run.bodyFontLoaded && !/^(serif|sans-serif|system-ui|monospace|ui-sans-serif|ui-serif|-apple-system)$/i.test(run.bodyFont)) once({ file: page, line: 0, sev: 'warn', rule: 'render-font', msg: `body font "${run.bodyFont}" did not load (fonts loaded: ${run.fonts.join(', ') || 'none'}) — check the @font-face URLs.` });
+    if (run.width < 768 && run.targets) { // phones: touch targets (components-and-states.md: 44px, WCAG 2.5.8 floor 24px)
+      const small = run.targets.filter((t) => Math.min(t.w, t.h) < 44);
+      for (const t of small.filter((x) => Math.min(x.w, x.h) < 24)) once({ file: page, line: 0, sev: 'warn', rule: 'render-target', msg: `${tag} <${t.el}> "${t.text}" is ${t.w}×${t.h}px — below the 24px floor (WCAG 2.5.8 unless it is spaced 24px from other targets); make it ≥ 44px tall.` });
+      const mid = small.filter((x) => Math.min(x.w, x.h) >= 24);
+      if (mid.length) once({ file: page, line: 0, sev: 'warn', rule: 'render-target', msg: `${tag} ${mid.length} control(s) between 24 and 44px (house rule 44px): ${mid.slice(0, 5).map((t) => `<${t.el}> "${t.text}" ${t.w}×${t.h}`).join(', ')}${mid.length > 5 ? ' …' : ''}.` });
+    }
     if (run.external.length) once({ file: page, line: 0, sev: IRAN ? 'error' : 'warn', rule: 'render-external', msg: `the page tried to load from other hosts (blocked during the test): ${[...new Set(run.external)].join(', ')}.` });
   }
   // no-JS view (JavaScript off; no measurement shims): content that disappears or stays empty without JS
@@ -717,7 +743,7 @@ if (flags.has('--json')) {
       for (const u of un.slice(0, 15)) console.log(`  ${u.file}:${u.line}  [${u.mode}] "${u.text}" — ${u.msg}`);
       if (un.length > 15) console.log(`  … ${un.length - 15} more (use --json for the full list)`);
     }
-    console.log(`Contrast: ${contrast.checked} text check(s) · ${contrast.checked - fails - house - un.length} pass · ${fails} fail · ${house} below the Persian 5.5:1 house rule · ${un.length} could not resolve (${by('dynamic')} dynamic classes, ${by('component')} components, ${by('image')} background images, ${by('unknown')} unknown colors, ${by('page')} unknown page colors)`);
+    console.log(`Contrast: ${contrast.checked} text check(s) · ${contrast.checked - fails - house - un.length} pass · ${fails} fail · ${house} below the Persian 5.5:1 house rule · ${un.length} could not resolve (${by('dynamic')} dynamic classes, ${by('component')} components, ${by('css')} CSS rules, ${by('image')} background images, ${by('unknown')} unknown colors, ${by('page')} unknown page colors)`);
   }
   for (const r of renders) {
     if (r.status === 'error') { console.log(`\nRender ${r.page}: ERROR — ${r.reason}.`); continue; }

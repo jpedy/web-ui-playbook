@@ -72,20 +72,8 @@ Stack-neutral rules for every project. How to apply them in a given stack (files
 - A client-rendered single-page app (React + Vite, Vue SPA) sends crawlers and slow phones an empty page until JavaScript runs: worse SEO and a late first view on slow networks. Prefer server rendering for anything public.
 - For Iranian audiences, avoid Vercel/Netlify hosting ⏱ (`iran-network-resilience.md`).
 
-## 5. No project yet? Standalone HTML recipe
-For previews and prototypes that still follow every rule:
-```bash
-mkdir site && cd site && npm init -y
-npm i -D tailwindcss @tailwindcss/cli
-npm i @fontsource-variable/vazirmatn @fontsource-variable/inter
-```
-- `src/app.css` = `@import "tailwindcss";` + `@source "../*.html";` + tokens (+ persian-base).
-- Copy the woff2 files you need from `node_modules/@fontsource-variable/<font>/files/` into `fonts/` and declare `@font-face` manually. The CLI does not copy font files, so `@import`ing the fontsource CSS from the CLI would leave broken `url()`s.
-- **Copy** `assets/tokens.css` (and `assets/persian-base.css` for Persian) into `src/`, then `@import "./tokens.css";`. Importing them straight from the skill folder fails, because `@import "tailwindcss"` can't resolve there (found in testing).
-- Build: `npx @tailwindcss/cli -i src/app.css -o dist/app.css --minify` (add `--watch` while editing; on npm 12+ the watcher's install script may need approval — a plain build works without it).
-- HTML links `dist/app.css`. **Never** `<script src="https://cdn.tailwindcss.com">`.
-- **Preview over HTTP, not `file://`:** ES modules (`<script type="module">`) are blocked on `file://`. Run `node <skill>/scripts/serve.mjs <folder>` (zero dependencies, http://localhost:4173).
-- Verified working in testing: Tailwind v4.3 CLI, Vazirmatn arabic-subset variable woff2 = 46KB (+35KB Latin subset), Inter Latin variable = 48KB, compiled CSS ≈ 26–28KB minified for a full landing page.
+## 5. No project yet? Standalone HTML
+Prototypes and small sites without a framework: `stacks/static-html.md` (plain CSS variables or the Tailwind CLI, self-hosted fonts, preview with `scripts/serve.mjs`, never the Tailwind Play CDN).
 
 ## 6. SEO and metadata baseline `[Proven]`
 - Server-rendered semantic HTML.

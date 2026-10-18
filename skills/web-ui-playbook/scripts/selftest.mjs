@@ -139,6 +139,14 @@ check(pd.length === 2 && pd.some((m) => /"ml-4"/.test(m)) && pd.some((m) => /"pl
 check(!(nx.findings || []).some((f) => /^(zwnj|fa-|arabic-|input-label|h1)/.test(f.rule)), `JSX: no findings from TypeScript code, the htmlFor label or the layout without <h1> (got: ${(nx.findings || []).filter((f) => f.rule !== 'physical-direction').map((f) => f.rule).join(', ') || 'none'})`);
 check(nx.contrast && !nx.contrast.unresolved.some((u) => u.why === 'component') && nx.contrast.unresolved.every((u) => u.reason === 'dynamic-class'), 'JSX: TypeScript generics are not read as components; cn() classes are "dynamic-class" (never passed)');
 
+// 3f. static sites (fixtures/static-en, profile stack static): plain-CSS colors are never passed statically; links exist
+const stDir = path.join(FX, 'static-en');
+const st = (() => { const r = spawnSync(process.execPath, [AUDIT, '.', '--contrast', '--json'], { encoding: 'utf8', cwd: stDir }); return JSON.parse(r.stdout); })();
+check(st.contrast?.unresolved.some((u) => u.reason === 'css-rule' && /too light/.test(u.text)) && !(st.findings || []).some((f) => f.rule === 'contrast' && /too light/.test(f.msg)), 'plain CSS: text colored by a CSS rule (.faint) is "could not resolve (css-rule)" — not checked against inherited colors');
+check((st.findings || []).some((f) => f.rule === 'broken-link' && f.sev === 'error' && /\/missing/.test(f.msg)) && (st.findings || []).some((f) => f.rule === 'clean-url' && f.sev === 'warn' && /\/work\/case/.test(f.msg)) && !(st.findings || []).some((f) => /"\/"/.test(f.msg)), 'static links: a missing page is an error, a clean URL that needs host rewriting is a warning, "/" is fine');
+const { detectStack: ds2 } = await import('./detect-stack.mjs');
+check(ds2(stDir).primary?.stack === 'static' && ds2(stDir).candidates.length === 1, 'detect-stack: a static site with a sub-folder of pages is one project, not two');
+
 // 3d. progressive disclosure: SKILL.md stays short; every stack adapter has the template's headings
 const skill = fs.readFileSync(path.join(DIR, '..', 'SKILL.md'), 'utf8');
 const desc = (skill.match(/^description: (.*)$/m) || [])[1] || '';
@@ -187,6 +195,10 @@ if (chrome) {
   check(dr.render?.[0].status === 'ok' && dr.render[0].kind === 'dir' && (dr.findings || []).some((f) => f.rule === 'render-contrast'), 'render folder mode: --render <build folder> --pages <name> (clean URL /render-fa → render-fa.html)');
   const down = audit([rfile, '--render', 'http://127.0.0.1:9/']);
   check(down.render?.[0].status === 'error' && (down.findings || []).some((f) => f.rule === 'render' && f.sev === 'error' && /not reachable/.test(f.msg)), 'render: an unreachable local server is an ERROR, never "skipped"');
+  const sr = (() => { const r = spawnSync(process.execPath, [AUDIT, '.', '--render', '.', '--pages', 'index', '--json'], { encoding: 'utf8', cwd: stDir }); return JSON.parse(r.stdout); })();
+  check((sr.findings || []).some((f) => f.rule === 'render-contrast' && /too light/.test(f.msg) && /1\.9\d:1/.test(f.msg)), 'plain CSS: --render measures the CSS-rule color the static check could not (1.90:1 → error)');
+  const tg = (sr.findings || []).filter((f) => f.rule === 'render-target').map((f) => f.msg).join('\n');
+  check(/"Work" is \d+×1\dpx/.test(tg) && /"Old page"/.test(tg), 'tap targets at 375px: links under 24px are reported (a link next to another link is not "running text")');
   const remote = audit([rfile, '--render', 'https://example.com/']);
   check(remote.render?.[0].status === 'error' && /only local URLs/.test(remote.render[0].reason), 'render: remote URLs are refused (local hosts only)');
 } else console.log('(no Chrome/Edge found: --render checks not run)');

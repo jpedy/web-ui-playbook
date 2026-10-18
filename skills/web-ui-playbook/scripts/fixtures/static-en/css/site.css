@@ -1,0 +1,4 @@
+:root { --text: #1f2937; --bg: #ffffff; --faint: #b8bcc4; }
+body { margin: 0; font: 16px/1.6 system-ui, sans-serif; color: var(--text); background: var(--bg); }
+.faint { color: var(--faint); }
+.tiny { font-size: 13px; line-height: 18px; }

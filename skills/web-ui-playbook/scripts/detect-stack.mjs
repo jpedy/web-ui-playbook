@@ -125,7 +125,12 @@ export function detectStack(root = '.') {
   const themes = path.join(root, 'wp-content', 'themes');
   if (fs.existsSync(themes)) for (const e of ls(themes)) if (e.isDirectory()) pushIn(path.join(themes, e.name));
   // monorepo / app-in-a-folder: one level down (skip when the root is already a framework app)
-  if (!top || top.stack === 'static') for (const e of ls(root)) if (e.isDirectory() && !SKIP.test(e.name) && !e.name.startsWith('.') && e.name !== 'wp-content') pushIn(path.join(root, e.name));
+  // (a static site's own sub-folders of pages, e.g. work/case.html, belong to it — only framework apps count there)
+  if (!top || top.stack === 'static') for (const e of ls(root)) if (e.isDirectory() && !SKIP.test(e.name) && !e.name.startsWith('.') && e.name !== 'wp-content') {
+    const sub = path.join(root, e.name);
+    if (top?.stack === 'static' && inspect(sub)?.stack === 'static') continue;
+    pushIn(sub);
+  }
   // a static root that only holds other apps is not a candidate itself
   const apps = candidates.filter((c) => c.stack !== 'static');
   const list = apps.length && candidates[0]?.stack === 'static' && candidates[0].dir === '.' ? candidates.filter((c) => !(c.stack === 'static' && c.dir === '.')) : candidates;

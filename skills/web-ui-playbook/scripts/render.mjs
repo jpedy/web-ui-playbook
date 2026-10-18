@@ -87,6 +87,11 @@ function measure(){
  document.fonts.forEach(function(f){if(f.status==='loaded')out.fonts.push(f.family.replace(/["']/g,'')+' '+f.weight);});
  out.bodyFont=fam;out.bodyFontLoaded=out.fonts.some(function(x){return x.indexOf(fam+' ')===0;});
  performance.getEntriesByType('resource').forEach(function(e){try{var u=new URL(e.name);if(u.hostname!=='127.0.0.1')out.external.push(u.host+u.pathname.slice(0,40));}catch(_){}});
+ // tap targets (controls, not links inside running text — WCAG 2.5.8 exempts those): size in CSS px
+ out.targets=[];document.querySelectorAll('a[href],button,summary,select,input:not([type=hidden]),textarea,[role=button],[tabindex]:not([tabindex="-1"])').forEach(function(el){
+  var r=el.getBoundingClientRect();if(r.width<=2||r.height<=2)return;var cs=getComputedStyle(el);if(cs.visibility==='hidden'||cs.display==='none')return;
+  var p=el.parentElement,inline=false;if(el.tagName==='A'&&p){var t='';p.childNodes.forEach(function(n){if(n.nodeType===3)t+=n.textContent;});inline=/\\S{2,}/.test(t.replace(/\\s+/g,' '))&&cs.display==='inline';}
+  if(!inline)out.targets.push({el:name(el),text:(el.textContent||el.getAttribute('aria-label')||'').replace(/\\s+/g,' ').trim().slice(0,30),w:Math.round(r.width),h:Math.round(r.height)});});
  out.viewport=[innerWidth,innerHeight];var json=JSON.stringify(out).replace(/</g,'\\\\u003c');
  if(window.parent!==window){window.parent.postMessage({__audit:json},'*');return;}
  var s=document.createElement('script');s.type='application/json';s.id='__audit_result';s.textContent=json;document.body.appendChild(s);

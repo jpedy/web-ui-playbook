@@ -36,3 +36,4 @@ An adapter that is not written yet: follow the core files, tell the user plainly
 |---|---|---|
 | `laravel.md` | Laravel 13 · Blade, Livewire 4, Inertia, Filament 5 | Tier 1 |
 | `next.md` | Next.js 16 App Router (TypeScript), shadcn/ui, next-intl | Tier 1 — test projects #1 (fa, Iran) and #2 (en, global) passed |
+| `static-html.md` | HTML/CSS/JS without a framework (CSS variables or Tailwind CLI) | Tier 1 — test project #4 |

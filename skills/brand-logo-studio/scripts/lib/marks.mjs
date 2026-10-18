@@ -136,8 +136,8 @@ export async function lockup(o) {
   const dotPaint = paint(mode, c, 'accentOnLight', 'accentOnDark');
   const P = 112, L = 100; // Persian set at 1.12 × Latin — a starting value; check visually (bilingual-lockups.md §2)
   const parts = [];
-  const needFa = ['h-rtl', 'h-ltr', 'stacked', 'fa-only', 'wordmark-fa'].includes(layout);
-  const needEn = ['h-rtl', 'h-ltr', 'stacked', 'wordmark-en'].includes(layout);
+  const needFa = !!o.fa && ['h-rtl', 'h-ltr', 'stacked', 'fa-only', 'wordmark-fa'].includes(layout); // a brand may have only a Latin name
+  const needEn = !!o.en && ['h-rtl', 'h-ltr', 'stacked', 'wordmark-en'].includes(layout);
   const needIcon = ['h-rtl', 'h-ltr', 'stacked', 'fa-only', 'icon'].includes(layout);
   const fa = needFa ? await wordmark(o.fa.text, o.fa.font, P, { accentDots: o.accentDots, base: 'rtl' }) : null;
   const en = needEn ? await wordmark(o.en.text, o.en.font, layout === 'stacked' ? 64 : L, { tracking: o.en.tracking || 0, base: 'ltr' }) : null;
@@ -164,7 +164,7 @@ export async function lockup(o) {
   }
   // Horizontal layouts: all wordmarks share one baseline (Persian korsi on the Latin baseline — never align by box bottoms).
   // Visual order left→right: h-rtl = Latin, Persian, icon (Iran-first); h-ltr = icon, Latin, Persian (global); fa-only = Persian, icon.
-  const words = layout === 'fa-only' ? [fa] : [en, fa];
+  const words = (layout === 'fa-only' ? [fa] : [en, fa]).filter(Boolean);
   const top = Math.min(...words.map((w) => w.bbox.y0)), bottom = Math.max(...words.map((w) => w.bbox.y1));
   const H = (bottom - top) * 1.4, gapIcon = 0.28 * H, gapWords = 0.45 * L, pad = 0.1 * H;
   const baseline = pad + (H - (bottom - top)) / 2 - top;

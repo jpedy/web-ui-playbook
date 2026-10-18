@@ -22,6 +22,15 @@
 - Audit: the html.js gate is found in any audited file (layouts); the palette generator's preview page is not audited; `--pages` survives Git Bash's path rewriting.
 - Tested: production builds of a Persian shop product page (market Iran) and an English SaaS landing (global, shadcn, static export) — results in the README support matrix.
 
+### Static HTML/CSS/JS (Tier 1)
+- **`references/stacks/static-html.md`** — no-framework adapter (plain CSS variables or the Tailwind CLI); it now holds the standalone recipe that was in `performance-and-tech.md` §5.
+- **`--format css-variables`** — `palette.vars.css`: plain custom properties, dark mode from the system setting and from `.dark` / `data-theme`.
+- Logo kit **stack `static`**: `head-snippet.html`. **Fixed:** an English-only brand name crashed the kit (lockups assumed a Persian name); kit wording for brands without a Persian name.
+- Audit: **plain-CSS colors are never passed statically** — a text inside an element whose CSS rule sets `color`/`background` is "could not resolve (css-rule)" and is measured by `--render` (no change for Tailwind projects, including all earlier test pages). Static sites: `broken-link` (error) and `clean-url` (warning) for internal links.
+- **`--render` tap targets** (all stacks): at phone width every control smaller than 24px (WCAG 2.5.8 floor) and the count between 24 and 44px (house rule) are warnings; links inside running text and visually hidden skip links are exempt.
+- detect-stack: a static site's own sub-folders of pages are not separate projects.
+- Tested: an English portfolio (two pages, plain CSS, market global); the tap-target check was then re-run on the Next.js projects (fixed there) and reports 7 sub-44px controls on the v2 Laravel school page.
+
 ### Internal
 - Markup readers moved to `scripts/parsers/` unchanged (each audit rule exists once for every stack).
 - `performance-and-tech.md` is stack-neutral now; Laravel setup, Blade components, Livewire/Filament/Inertia notes moved to `references/stacks/laravel.md` (updated to current versions).

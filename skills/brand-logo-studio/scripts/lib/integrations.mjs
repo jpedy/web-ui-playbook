@@ -3,6 +3,7 @@
  * How the finished kit plugs into the user's stack: extra files written next to the kit and the install sentence
  * for kit-report.md. The masters, PNGs, favicon.ico/svg and site.webmanifest are the same for every stack.
  *   laravel   head-snippet.blade.php (copy the kit to public/brand/)
+ *   static    head-snippet.html (copy the kit to /brand/)
  *   next      next-app/ — files named for Next.js App Router file conventions (⏱ nextjs.org docs, checked 2026-10-18:
  *             favicon.ico only in the top-level app/, icon.svg, apple-icon.png, opengraph-image.png (+ .alt.txt),
  *             manifest.json in the root of app/, theme color through the `viewport` export)
@@ -23,6 +24,19 @@ export const INTEGRATIONS = {
       `<meta name="theme-color" content="${c.primary}">`,
       `<meta property="og:image" content="{{ asset('brand/png/og-image.png') }}">`, ''].join('\n')]],
     install: 'Copy the folder to `public/brand/` in your Laravel project and paste `head-snippet.blade.php` into the `<head>` of your layout.',
+  },
+  static: {
+    files: ({ c, brief }) => [['head-snippet.html', [
+      '<!-- Copy this kit to /brand/ next to index.html and paste inside <head> of every page -->',
+      '<link rel="icon" href="/brand/favicon.ico" sizes="32x32">',
+      '<link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">',
+      '<link rel="apple-touch-icon" href="/brand/png/apple-touch-icon.png">',
+      '<link rel="manifest" href="/brand/site.webmanifest">',
+      `<meta name="theme-color" content="${c.primary}" media="(prefers-color-scheme: light)">`,
+      `<meta name="theme-color" content="${c.darkBg}" media="(prefers-color-scheme: dark)">`,
+      `<meta property="og:image" content="https://YOUR-DOMAIN/brand/png/og-image.png"> <!-- absolute URL: replace YOUR-DOMAIN -->`,
+      `<meta property="og:image:alt" content="${[brief.name.fa, brief.name.en].filter(Boolean).join(' — ')}">`, ''].join('\n')]],
+    install: 'Static site: copy the folder to `/brand/` next to `index.html` and paste `head-snippet.html` into the `<head>` of every page (replace YOUR-DOMAIN in the og:image line — it must be an absolute URL).',
   },
   next: {
     files: ({ c, brief, out }) => {

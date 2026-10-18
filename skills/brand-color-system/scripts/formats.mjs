@@ -3,6 +3,7 @@
  * One palette (the object buildPalette() returns) → token files for each stack. generate-palette.mjs --format picks
  * them; every format carries the same checked colors, so the contrast results in palette-report.md hold for all.
  *   tailwind4   palette.css — :root/.dark variables + @theme inline (Laravel, Next.js with Tailwind v4, static + Tailwind CLI)
+ *   css-variables  palette.vars.css — plain CSS custom properties, OS dark mode + .dark/[data-theme] (static HTML, WordPress classic, any CSS)
  *   shadcn      palette.shadcn.css — shadcn/ui variable names (Next.js + shadcn, Inertia + React + shadcn)
  * Which format a stack uses: web-ui-playbook references/stacks/<stack>.md ("Where tokens live").
  */
@@ -136,12 +137,58 @@ ${RADIUS.map(([k, m]) => `  --radius-${k}: ${m === 1 ? 'var(--radius)' : `calc(v
 `;
 }
 
+/** Plain CSS custom properties (no Tailwind): light in :root, dark under .dark / [data-theme=dark] and the OS setting. */
+function cssVariables(p) {
+  const decl = (name, hex, mode) => `  --${name}: ${cssOklch(hex)}; /* ${hex} ${ROLE[name] || ''}${worst(p, mode, name)} */`;
+  const scale = (prefix, s) => s.map((x) => `  --${prefix}-${x.stop}: ${cssOklch(x.hex)}; /* ${x.hex}${x.anchored ? ' ← exact' : ''} */`).join('\n');
+  const dark = ORDER.map((t) => '  ' + decl(t, p.tokens.dark[t], 'dark')).join('\n');
+  return `/* ==========================================================================
+   Brand palette — ${p.meta.name} — plain CSS variables (no Tailwind needed)
+   Generated ${p.meta.generated} by brand-color-system/scripts/generate-palette.mjs --format css-variables
+   Brand color ${p.brand.hex} kept exactly as --brand. Every text/background pair was checked
+   (WCAG 2.2 AA${p.meta.fa ? '; Persian small text ≥ 5.5:1 house rule' : ''}) — see palette-report.md.
+   Use: <link rel="stylesheet" href="css/palette.vars.css"> before your own CSS, then write
+   color: var(--text); background: var(--surface); a { color: var(--primary-ink) } …
+   Dark mode follows the visitor's system setting; class="dark" or data-theme="dark" on <html> forces it,
+   data-theme="light" forces light.
+   ========================================================================== */
+
+:root {
+${ORDER.map((t) => decl(t, p.tokens.light[t], 'light')).join('\n')}
+  color-scheme: light;
+}
+
+/* Full scales for charts and illustrations — prefer the semantic variables above */
+:root {
+${scale('brand', p.scales.brand)}
+${p.scales.accent !== p.scales.brand ? scale('accent', p.scales.accent) + '\n' : ''}${scale('base', p.scales.base)}
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+${dark}
+    color-scheme: dark;
+  }
+}
+
+.dark, [data-theme="dark"] {
+${ORDER.map((t) => decl(t, p.tokens.dark[t], 'dark')).join('\n')}
+  color-scheme: dark;
+}
+`;
+}
+
 /** name → { file, build(p) → text, install: plain-words first step for palette-report.md } */
 export const FORMATS = {
   tailwind4: {
     file: 'palette.css',
     build: tailwind4,
     install: 'Copy `palette.css` next to `tokens.css` (web-ui-playbook) and add `@import "./palette.css";` right after the tokens import.',
+  },
+  'css-variables': {
+    file: 'palette.vars.css',
+    build: cssVariables,
+    install: 'Plain HTML/CSS (no Tailwind): link `palette.vars.css` before your own stylesheet and use the variables (`color: var(--text)`, `background: var(--primary)`, links `var(--primary-ink)`).',
   },
   shadcn: {
     file: 'palette.shadcn.css',

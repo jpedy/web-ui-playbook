@@ -213,6 +213,13 @@ if (chrome) {
   check(want.every((f) => f in nf) && String(nf['next-app/favicon.ico']) === 'ICO' && String(nf['next-app/apple-icon.png']) === 'APPLE' && String(nf['next-app/icon.svg']) === '<svg/>', 'stack next: favicon.ico, icon.svg, apple-icon.png, opengraph-image.png (+alt), manifest.json, viewport snippet and README, copied from the kit');
   const man = JSON.parse(nf['next-app/manifest.json']);
   check(man.dir === 'rtl' && man.lang === 'fa' && man.icons.some((i) => i.purpose === 'maskable') && /themeColor/.test(nf['next-app/viewport.ts.txt']) && /metadataBase/.test(nf['next-app/README.md']) && /top-level/.test(nf['next-app/README.md']), 'stack next: RTL manifest with a maskable icon; theme color via viewport; README says top-level app/ and metadataBase');
+  const sf = Object.fromEntries(integrationFor('static').files({ c: { primary: '#0d9488', darkBg: '#060807' }, brief: { name: { en: 'Mira Holt' } } }));
+  check(/rel="icon" href="\/brand\/favicon\.svg"/.test(sf['head-snippet.html']) && /YOUR-DOMAIN/.test(sf['head-snippet.html']) && /media="\(prefers-color-scheme: dark\)"/.test(sf['head-snippet.html']), 'stack static: head-snippet.html with /brand/ paths, light/dark theme colors and an absolute og:image to fill in');
+  // a brand with only a Latin name (English sites outside Iran): every layout it needs renders
+  const fxB = loadBrief(fxFile);
+  const enOnly = async (layout) => (await lockup({ layout, mode: 'color', colors: fxB.colors, icon: 'R1_monogram', letter: 'M', letterFont: 'vazirmatn-black', accentDots: 'none', fa: null, en: { text: 'Mira Holt', font: 'inter:800' } })).svg;
+  const okEn = await Promise.all(['h-ltr', 'wordmark-en', 'icon'].map((l) => enOnly(l).then((s) => /<path/.test(s)).catch(() => false)));
+  check(okEn.every(Boolean), `English-only brand: h-ltr, wordmark-en and icon lockups render (got ${okEn.join(', ')})`);
   check(integrationFor('wix-or-unknown').stack === 'laravel', 'unknown stack falls back to the Laravel integration (the original default)');
   fs.rmSync(kitDir, { recursive: true, force: true });
 }
