@@ -1,0 +1,8 @@
+<!doctype html>
+<!-- Fixture: references in inline JSON. Expected (render-foreign-ref): s.w.org (an image base URL some devices fetch) is
+     reported; ajax.googleapis.com/…/prototype.js inside a JSON registry of scripts is not; example.org is the site's own
+     domain (canonical). -->
+<html lang="en"><head><meta charset="utf-8"><title>refs</title>
+<link rel="canonical" href="https://example.org/page">
+<script>window.cfg = {"baseUrl":"https:\/\/s.w.org\/images\/core\/emoji\/17\/72x72\/","scripts":{"prototype":"https:\/\/ajax.googleapis.com\/ajax\/libs\/prototype\/1.7.1.0\/prototype.js"},"self":"https:\/\/example.org\/x"};</script>
+</head><body><h1>References</h1><p>Body text.</p></body></html>

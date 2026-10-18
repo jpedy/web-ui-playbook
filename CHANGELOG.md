@@ -31,6 +31,13 @@
 - detect-stack: a static site's own sub-folders of pages are not separate projects.
 - Tested: an English portfolio (two pages, plain CSS, market global); the tap-target check was then re-run on the Next.js projects (fixed there) and reports 7 sub-44px controls on the v2 Laravel school page.
 
+### WordPress (Tier 1 — runtime-tested in WordPress Playground, not on real hosting)
+- **`references/stacks/wordpress.md`** — block themes (theme.json v3), classic PHP themes and WooCommerce basics, verified 2026-10-18/19 against developer.wordpress.org, the Gutenberg schema, WordPress core source and WooCommerce docs, and **proven on running sites** in WordPress Playground: `rtl.css` is loaded by WordPress itself (after `style.css`), `dir="rtl"` comes from the site language, theme.json `fontFace` self-hosts fonts, Cart/Checkout use blocks by default, new stores start in coming-soon mode, core's emoji fallback references `s.w.org` (remove it for market Iran — hooks verified).
+- **`--format wordpress`** — `theme.palette.json` (theme.json v3 palette + styles; text slug `contrast`), `styles/dark.json` (style variation) and `palette.wp-dark.css` (system dark mode over the preset variables).
+- Logo kit **stack `wordpress`**: `wordpress/site-icon-512.png` (WordPress makes the sizes), a `custom-logo` + `theme-color` snippet and a README.
+- Audit: `.php` templates for stack `wordpress` only; `theme.json` presets and `has-{slug}-color` classes in `--contrast`; `<html <?php language_attributes(); ?>>` counts as `lang` + `dir`; equal left/right spacing is direction-neutral (WordPress block spacing); `--render` rewrites a local server's absolute URLs to the audit origin.
+- **`--render` foreign references** (all stacks): foreign hosts a rendered page references in scripts, styles, media and inline data are reported even when this browser did not fetch them (error for market Iran) — the site's own domain and JSON lists of registered `.js`/`.css` files are not counted.
+
 ### Internal
 - Markup readers moved to `scripts/parsers/` unchanged (each audit rule exists once for every stack).
 - `performance-and-tech.md` is stack-neutral now; Laravel setup, Blade components, Livewire/Filament/Inertia notes moved to `references/stacks/laravel.md` (updated to current versions).

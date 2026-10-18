@@ -38,6 +38,31 @@ export const INTEGRATIONS = {
       `<meta property="og:image:alt" content="${[brief.name.fa, brief.name.en].filter(Boolean).join(' — ')}">`, ''].join('\n')]],
     install: 'Static site: copy the folder to `/brand/` next to `index.html` and paste `head-snippet.html` into the `<head>` of every page (replace YOUR-DOMAIN in the og:image line — it must be an absolute URL).',
   },
+  // ⏱ developer.wordpress.org (2026-10-18): wp_site_icon() prints icon 32/192, apple-touch-icon 180 and the 270 tile from
+  // the Site Icon setting, so the theme ships no <link> tags — the owner uploads one 512×512 PNG.
+  wordpress: {
+    files: ({ c, brief, out }) => [
+      ['wordpress/site-icon-512.png', fs.readFileSync(path.join(out, 'png', 'icon-512.png'))],
+      ['wordpress/functions-snippet.php', [
+        '<?php',
+        '// Paste into the theme\'s functions.php (classic themes; block themes use the Site Logo block and need none of this).',
+        "add_action( 'after_setup_theme', function () {",
+        "\tadd_theme_support( 'custom-logo', array( 'height' => 96, 'width' => 320, 'flex-height' => true, 'flex-width' => true ) );",
+        '} );',
+        '// Theme color for mobile browser chrome (WordPress prints no theme-color by itself).',
+        "add_action( 'wp_head', function () {",
+        `\techo '<meta name="theme-color" content="${c.primary}" media="(prefers-color-scheme: light)">' . "\\n";`,
+        `\techo '<meta name="theme-color" content="${c.darkBg}" media="(prefers-color-scheme: dark)">' . "\\n";`,
+        '} );', ''].join('\n')],
+      ['wordpress/README.md', [
+        `# Brand files for WordPress — ${[brief.name.fa, brief.name.en].filter(Boolean).join(' / ')}`, '',
+        '1. **Site Icon (favicon, app icons):** upload `site-icon-512.png` in Appearance → Editor → Site Icon (block themes) or Customizer → Site Identity (classic). WordPress makes the 32, 180, 192 and 270 px sizes and prints their tags itself.',
+        '2. **Logo in the header:** block themes — the Site Logo block, upload `svg/logo-h-rtl.svg` (or the PNG `png/logo-light@2x.png` if SVG uploads are not allowed on the site); classic themes — paste `functions-snippet.php` into functions.php, then upload the logo in Customizer → Site Identity and print it with `the_custom_logo()`.',
+        '3. **Social share image:** use `png/og-image.png` in your SEO plugin\'s default image setting (WordPress core has no og:image).',
+        '4. Dark backgrounds: `svg/*-reversed.svg`.', ''].join('\n')],
+    ],
+    install: 'WordPress: upload `wordpress/site-icon-512.png` as the Site Icon (WordPress makes the other sizes), use the Site Logo block (block themes) or `wordpress/functions-snippet.php` + `the_custom_logo()` (classic) — steps in `wordpress/README.md`.',
+  },
   next: {
     files: ({ c, brief, out }) => {
       const kit = (rel) => fs.readFileSync(path.join(out, rel));

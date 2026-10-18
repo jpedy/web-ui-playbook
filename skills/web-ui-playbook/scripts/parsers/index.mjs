@@ -15,6 +15,7 @@ const KIND = [
   [/\.blade\.php$/i, 'blade'],
   [/\.html?$/i, 'html'],
   [/\.(jsx|tsx)$/i, 'jsx'],
+  [/\.php$/i, 'php'], // WordPress templates (read only when the stack is wordpress — see audit.mjs walk)
   [/\.vue$/i, 'vue'],
 ];
 const READERS = {
@@ -33,6 +34,6 @@ export function parserFor(file) {
     isCss: name === 'css',
     isPage: name === 'html' || name === 'blade',
     // a Next.js layout holds <html> but the page's <h1> lives in page.tsx
-    isLayout: name === 'jsx' && /(^|[\\/])layout\.(jsx|tsx)$/i.test(file),
+    isLayout: (name === 'jsx' && /(^|[\\/])layout\.(jsx|tsx)$/i.test(file)) || name === 'php', // WP: <html> in header.php, <h1> in other templates
   };
 }

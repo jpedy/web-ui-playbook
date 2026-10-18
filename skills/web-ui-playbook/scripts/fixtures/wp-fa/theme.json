@@ -1,0 +1,10 @@
+{
+  "version": 3,
+  "settings": { "color": { "palette": [
+    { "slug": "base", "name": "Background", "color": "#ffffff" },
+    { "slug": "contrast", "name": "Text", "color": "#1f2937" },
+    { "slug": "surface", "name": "Surface", "color": "#f3f4f6" },
+    { "slug": "faint", "name": "Faint", "color": "#b8bcc4" }
+  ] } },
+  "styles": { "color": { "background": "var:preset|color|base", "text": "var:preset|color|contrast" } }
+}

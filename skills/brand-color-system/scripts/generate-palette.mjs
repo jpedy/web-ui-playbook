@@ -22,7 +22,8 @@
  *   --market <m>             iran: also warn when the brand is close to a well-known Iranian brand
  *                            (data: references/iran-brand-colors.md, dated — verify) · global: no market table
  *   --format <list>          token files to write, comma-separated (default tailwind4): tailwind4 (palette.css),
- *                            css-variables (palette.vars.css — plain CSS), shadcn (palette.shadcn.css — shadcn/ui names)
+ *                            css-variables (palette.vars.css — plain CSS), shadcn (palette.shadcn.css — shadcn/ui names),
+ *                            wordpress (theme.palette.json + styles/dark.json + palette.wp-dark.css — theme.json v3)
  *                            — formats per stack: web-ui-playbook references/stacks/<stack>.md
  *   Without --lang / --market, the project's .web-ui-playbook.json (web-ui-playbook profile) supplies them.
  *   --competitor "<hex>[:Name]"   extra competitor color (repeatable)
@@ -104,7 +105,7 @@ catch (e) { console.error(e.message); process.exit(2); }
 
 // ---------- writers (token formats: formats.mjs) ----------
 const css = FORMATS.tailwind4.build(p); // also feeds the preview page
-const outputs = formats.map((f) => [FORMATS[f].file, f === 'tailwind4' ? css : FORMATS[f].build(p)]);
+const outputs = formats.flatMap((f) => [[FORMATS[f].file, f === 'tailwind4' ? css : FORMATS[f].build(p)], ...(FORMATS[f].extra ? FORMATS[f].extra(p) : [])]);
 
 const rnd = (x, d = 2) => Number(x.toFixed(d));
 const json = {
@@ -224,7 +225,7 @@ ${p.warnings.length ? `<h3>Warnings</h3><ul>${p.warnings.map((d) => `<li>${esc(d
 
 fs.mkdirSync(outDir, { recursive: true });
 const files = { ...Object.fromEntries(outputs), 'palette.json': JSON.stringify(json, null, 2), 'palette-report.md': report, 'palette-preview.html': preview };
-for (const [f, content] of Object.entries(files)) fs.writeFileSync(path.join(outDir, f), content);
+for (const [f, content] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(outDir, f)), { recursive: true }); fs.writeFileSync(path.join(outDir, f), content); }
 
 // ---------- console summary ----------
 if (opts.json) console.log(JSON.stringify(json, null, 2));

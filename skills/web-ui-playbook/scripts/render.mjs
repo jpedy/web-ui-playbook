@@ -87,6 +87,17 @@ function measure(){
  document.fonts.forEach(function(f){if(f.status==='loaded')out.fonts.push(f.family.replace(/["']/g,'')+' '+f.weight);});
  out.bodyFont=fam;out.bodyFontLoaded=out.fonts.some(function(x){return x.indexOf(fam+' ')===0;});
  performance.getEntriesByType('resource').forEach(function(e){try{var u=new URL(e.name);if(u.hostname!=='127.0.0.1')out.external.push(u.host+u.pathname.slice(0,40));}catch(_){}});
+ // foreign hosts the page REFERENCES in scripts, styles, media and frames (even when this browser did not need them,
+ // e.g. WordPress's emoji fallback to s.w.org on devices without emoji fonts); plain <a href> links are not counted
+ out.refs=[];var seenRef={};
+ // the site's own production domain (canonical / og:url / og:image, e.g. Next.js metadataBase) is not foreign
+ document.querySelectorAll('link[rel=canonical],meta[property="og:url"],meta[property="og:image"],meta[name="twitter:image"]').forEach(function(m){var v=m.getAttribute('href')||m.getAttribute('content')||'';var h=(v.match(/^https?:\\/\\/([^\\/:]+)/i)||[])[1];if(h)seenRef[h.toLowerCase()]=1;});
+ function ref(u){var m=String(u).replace(/\\\\\\//g,'/').match(/https?:\\/\\/([a-z0-9.-]+\\.[a-z]{2,})/gi);(m||[]).forEach(function(x){var h=x.replace(/^https?:\\/\\//i,'').toLowerCase();if(h!==location.hostname&&h!=='127.0.0.1'&&h!=='localhost'&&!seenRef[h]){seenRef[h]=1;out.refs.push(h);}});}
+ document.querySelectorAll('script[src],link[href]:not([rel=canonical]):not([rel=alternate]):not([rel=shortlink]),img[src],img[srcset],source[src],source[srcset],iframe[src],video[src],audio[src],embed[src],object[data]').forEach(function(el){if(el.tagName==='LINK'&&/^(canonical|alternate|shortlink|https:\\/\\/api\\.w\\.org\\/|EditURI|pingback|dns-prefetch)$/i.test(el.getAttribute('rel')||''))return;ref(el.getAttribute('src')||el.getAttribute('href')||el.getAttribute('data')||'');ref(el.getAttribute('srcset')||'');});
+ document.querySelectorAll('script:not([src]),style').forEach(function(el){if(el.id==='__audit_static'||el.type==='application/ld+json')return;var t=el.textContent;if(/__audit/.test(t))return;
+  // JSON data (https:\\/\\/… escaped by wp_json_encode etc.) that lists .js/.css files is a registry, not a load: WordPress
+  // core still registers prototype.js on ajax.googleapis.com, and WooCommerce prints that list — loaded files are elements
+  t=t.replace(/https?:\\\\\\/\\\\\\/[^"'\\s]*?\\.(?:js|css)(?:\\?[^"'\\s]*)?(?=["'\\s])/gi,'');ref(t);});
  // tap targets (controls, not links inside running text — WCAG 2.5.8 exempts those): size in CSS px
  out.targets=[];document.querySelectorAll('a[href],button,summary,select,input:not([type=hidden]),textarea,[role=button],[tabindex]:not([tabindex="-1"])').forEach(function(el){
   var r=el.getBoundingClientRect();if(r.width<=2||r.height<=2)return;var cs=getComputedStyle(el);if(cs.visibility==='hidden'||cs.display==='none')return;
@@ -200,7 +211,9 @@ function proxy(origin, req, res, u, probed, nojs, waitMs) {
         for (const k of ['content-length', 'content-encoding', 'etag', 'content-security-policy', 'content-security-policy-report-only']) delete h[k];
         h['cache-control'] = 'no-store';
         res.writeHead(pr.statusCode, h);
-        res.end(inject(Buffer.concat(chunks).toString('utf8'), nojs, waitMs));
+        // absolute links to the upstream (WordPress writes http://127.0.0.1:9400/wp-content/…) stay on the audit origin
+        const html = Buffer.concat(chunks).toString('utf8').split(up.origin).join('').split(`http://localhost:${up.port}`).join('').split(up.origin.replace(/\//g, '\\/')).join(''); // also the JSON-escaped http:\/\/host form
+        res.end(inject(html, nojs, waitMs));
       });
       return;
     }

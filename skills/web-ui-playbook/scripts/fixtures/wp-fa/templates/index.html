@@ -1,0 +1,13 @@
+<!-- Fixture: block template. Expected: has-faint-color on surface = contrast error; has-contrast-color passes;
+     symmetric padding-left/right is fine, unequal padding is a physical-css error (Persian page). -->
+<!-- wp:group {"backgroundColor":"surface","style":{"spacing":{"padding":{"left":"1rem","right":"1rem"}}}} -->
+<div class="wp-block-group has-surface-background-color has-background" style="padding-left:1rem;padding-right:1rem">
+<!-- wp:paragraph {"textColor":"faint"} -->
+<p class="has-faint-color has-text-color">این متن کم‌رنگ روی سطح خاکستری خوانا نیست و باید خطا بگیرد.</p>
+<!-- /wp:paragraph -->
+<!-- wp:paragraph {"textColor":"contrast"} -->
+<p class="has-contrast-color has-text-color">این متن پررنگ است و از آزمون کنتراست رد نمی‌شود.</p>
+<!-- /wp:paragraph -->
+<p style="padding-left:2rem;padding-right:0">فاصلهٔ نامتقارن در صفحهٔ راست‌به‌چپ.</p>
+</div>
+<!-- /wp:group -->

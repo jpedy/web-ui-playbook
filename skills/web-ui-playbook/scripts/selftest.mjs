@@ -147,6 +147,21 @@ check((st.findings || []).some((f) => f.rule === 'broken-link' && f.sev === 'err
 const { detectStack: ds2 } = await import('./detect-stack.mjs');
 check(ds2(stDir).primary?.stack === 'static' && ds2(stDir).candidates.length === 1, 'detect-stack: a static site with a sub-folder of pages is one project, not two');
 
+// 3g. WordPress (fixtures/wp-fa, profile stack wordpress): theme.json presets, has-*-color classes, PHP templates
+const wpDir = path.join(FX, 'wp-fa');
+const wp = (() => { const r = spawnSync(process.execPath, [AUDIT, '.', '--contrast', '--json'], { encoding: 'utf8', cwd: wpDir }); return JSON.parse(r.stdout); })();
+const wpC = (wp.findings || []).filter((f) => f.rule === 'contrast');
+check(wpC.length === 1 && /has-faint-color/.test(wpC[0].msg) && /has-surface-background-color/.test(wpC[0].msg) && wp.contrast?.unresolved.length === 0, 'WordPress: has-{slug}-color classes resolve through theme.json presets (faint on surface fails; nothing unresolved)');
+check(wp.contrast?.cssFiles.some((f) => /theme\.json$/.test(f)), 'WordPress: theme.json is a token source for --contrast');
+check((wp.findings || []).filter((f) => f.rule === 'physical-css').length === 2 && (wp.findings || []).filter((f) => f.rule === 'physical-css').every((f) => f.line === 11), 'block spacing: equal padding-left/right is direction-neutral; only the unequal pair is an error');
+check(wp.files === 3 && !(wp.findings || []).some((f) => /html-lang|html-dir/.test(f.rule)), 'PHP templates are read for stack wordpress, and <html <?php language_attributes(); ?>> counts as lang + dir');
+const plainDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wup-php-'));
+fs.copyFileSync(path.join(wpDir, 'header.php'), path.join(plainDir, 'header.php'));
+fs.writeFileSync(path.join(plainDir, 'package.json'), '{}'); // project root without a profile
+const notWp = (() => { const r = spawnSync(process.execPath, [AUDIT, '.', '--json'], { encoding: 'utf8', cwd: plainDir }); return JSON.parse(r.stdout); })();
+fs.rmSync(plainDir, { recursive: true, force: true });
+check(notWp.files === 0, 'without stack wordpress, .php files are not audited (Laravel apps keep their PHP classes out)');
+
 // 3d. progressive disclosure: SKILL.md stays short; every stack adapter has the template's headings
 const skill = fs.readFileSync(path.join(DIR, '..', 'SKILL.md'), 'utf8');
 const desc = (skill.match(/^description: (.*)$/m) || [])[1] || '';
@@ -199,6 +214,9 @@ if (chrome) {
   check((sr.findings || []).some((f) => f.rule === 'render-contrast' && /too light/.test(f.msg) && /1\.9\d:1/.test(f.msg)), 'plain CSS: --render measures the CSS-rule color the static check could not (1.90:1 → error)');
   const tg = (sr.findings || []).filter((f) => f.rule === 'render-target').map((f) => f.msg).join('\n');
   check(/"Work" is \d+×1\dpx/.test(tg) && /"Old page"/.test(tg), 'tap targets at 375px: links under 24px are reported (a link next to another link is not "running text")');
+  const refs = audit([path.join(FX, 'refs.html'), '--render', path.join(FX, 'refs.html'), '--market', 'iran']);
+  const refMsg = (refs.findings || []).filter((f) => f.rule === 'render-foreign-ref');
+  check(refMsg.length === 1 && refMsg[0].sev === 'error' && /s\.w\.org/.test(refMsg[0].msg) && !/googleapis|example\.org/.test(refMsg[0].msg), 'render-foreign-ref: an image base URL in inline JSON counts (error for Iran); a JSON registry of .js files and the site\'s own domain do not');
   const remote = audit([rfile, '--render', 'https://example.com/']);
   check(remote.render?.[0].status === 'error' && /only local URLs/.test(remote.render[0].reason), 'render: remote URLs are refused (local hosts only)');
 } else console.log('(no Chrome/Edge found: --render checks not run)');

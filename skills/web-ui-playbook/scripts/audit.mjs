@@ -70,7 +70,7 @@ function walk(p, out = []) {
       if (SKIP_DIR.test(name)) continue;
       walk(path.join(p, name), out);
     }
-  } else if (EXT.test(p) && !/\.min\.css$/i.test(p) && !/palette-preview\.html$/i.test(p)) out.push(p); // not the palette generator's preview
+  } else if ((EXT.test(p) || (S.stack === 'wordpress' && /\.php$/i.test(p) && !/\.blade\.php$/i.test(p))) && !/\.min\.css$/i.test(p) && !/palette-preview\.html$/i.test(p)) out.push(p); // not the palette generator's preview
   return out;
 }
 
@@ -185,7 +185,10 @@ function auditFile(file) {
       [/float\s*:\s*(left|right)/g, 'error', 'use float: inline-start/inline-end'],
       [/border-(left|right)(-[a-z]+)?\s*:/g, 'error', 'use border-inline-start/end'],
     ];
-    if (rtl) for (const [re, sev, fix] of rules) for (const m of text.matchAll(re)) add(sev, 'physical-css', base + m.index, `Physical CSS "${m[0].trim()}" — ${fix}.`);
+    // equal left/right margin or padding is direction-neutral (WordPress block spacing writes padding-left/right this way)
+    const decl = (prop) => (text.match(new RegExp(`(?:^|[;{\\s])${prop}\\s*:\\s*([^;}]+)`)) || [])[1]?.trim();
+    const symmetric = (m) => { const s = m[0].match(/\b(margin|padding)-(left|right)\b/); return s && decl(`${s[1]}-left`) != null && decl(`${s[1]}-left`) === decl(`${s[1]}-right`); };
+    if (rtl) for (const [re, sev, fix] of rules) for (const m of text.matchAll(re)) if (!symmetric(m)) add(sev, 'physical-css', base + m.index, `Physical CSS "${m[0].trim()}" — ${fix}.`);
     for (const m of text.matchAll(/outline\s*:\s*(none|0)\b/g)) add('warn', 'focus-removed', base + m.index, 'outline removed — make sure :focus-visible has a visible replacement.');
     if (rtl) for (const m of text.matchAll(/(?<![\w-])letter-spacing\s*:(?!\s*(0(px|em|rem)?(?![\d.])|normal))[^;}]+/g)) add('warn', 'fa-tracking', base + m.index, `"${m[0]}" — Persian needs letter-spacing 0.`);
     for (const m of text.matchAll(/(?<!-)\b100vh\b/g)) add('warn', 'vh-unit', base + m.index, '100vh — prefer 100dvh.');
@@ -199,8 +202,10 @@ function auditFile(file) {
       add('warn', 'sticky-in-scroller', m.index, 'Sticky <thead> inside overflow-x-auto: make the wrapper the scroll container (max-h-[70dvh] overflow-auto) and use top-0.');
     const htmlTag = src.match(/<html\b[^>]*>/i);
     if (htmlTag) {
-      if (!/\blang\s*=/.test(htmlTag[0])) add('error', 'html-lang', htmlTag.index, '<html> has no lang attribute.');
-      if (persianCount > 20 && !/\bdir\s*=/.test(src)) add('error', 'html-dir', htmlTag.index, 'Persian content but no dir="rtl" anywhere.');
+      // attributes printed by the server count as set: <html <?php language_attributes(); ?>> (WordPress prints lang + dir)
+      const printedAttrs = /<\?php|\{\{|\{!!/.test(htmlTag[0]) || /<html\b[^>]*<\?php\s+language_attributes/.test(src);
+      if (!printedAttrs && !/\blang\s*=/.test(htmlTag[0])) add('error', 'html-lang', htmlTag.index, '<html> has no lang attribute.');
+      if (!printedAttrs && persianCount > 20 && !/\bdir\s*=/.test(src)) add('error', 'html-dir', htmlTag.index, 'Persian content but no dir="rtl" anywhere.');
       const h1s = [...src.matchAll(/<h1\b/gi)];
       if (h1s.length === 0 && !P.isLayout) add('warn', 'h1', htmlTag.index, 'Page has no <h1>.');
       if (h1s.length > 1) add('warn', 'h1', h1s[1].index, `Page has ${h1s.length} <h1> elements — use one.`);
@@ -385,6 +390,14 @@ function loadTheme(cssFiles) {
   const vars = { light: {}, dark: {} };
   const cssColorClasses = new Set(); // classes whose own CSS rules set text or background colors (plain-CSS sites)
   for (const f of cssFiles) {
+    if (/\.json$/i.test(f)) { // WordPress theme.json: palette presets → --wp--preset--color--{slug}; page colors from styles.color
+      let tj = null; try { tj = JSON.parse(fs.readFileSync(f, 'utf8')); } catch { continue; }
+      for (const c of tj?.settings?.color?.palette || []) if (c.slug && c.color) vars.light[`--wp--preset--color--${c.slug}`] = c.color;
+      const ref = (v) => (typeof v === 'string' ? v.replace(/^var:preset\|color\|([\w-]+)$/, 'var(--wp--preset--color--$1)') : null);
+      if (ref(tj?.styles?.color?.background)) vars.light['--wp-page-bg'] = ref(tj.styles.color.background);
+      if (ref(tj?.styles?.color?.text)) vars.light['--wp-page-fg'] = ref(tj.styles.color.text);
+      continue;
+    }
     for (const b of cssBlocks(fs.readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, ''))) {
       const sel = b.context[b.context.length - 1] || '';
       if (/(^|[;\s{])(color|background(-color)?)\s*:/.test(b.body) && !/^@/.test(sel))
@@ -479,6 +492,14 @@ function styleOf(el, mode, R) {
       const util = parts.pop().replace(/^!/, '');
       if (parts.join(':') !== variant) continue;
       let m;
+      // WordPress block classes: has-{slug}-color / has-{slug}-background-color → theme.json presets
+      // (has-text-color and has-background are WordPress's own marker classes, not colors)
+      if ((m = util.match(/^has-([\w-]+?)(-background)?-color$/))) {
+        const isBg = !!m[2], r = R.resolveValue(`var(--wp--preset--color--${m[1]})`, mode);
+        if (r.color) { if (isBg) { out.bg = r.color; out.bgFrom = tok; delete out.unknownBg; } else { out.fg = r.color; out.fgFrom = tok; delete out.unknownFg; } }
+        else if (!['text', 'link', 'background'].includes(m[1])) { if (isBg) out.unknownBg = `${tok} (${r.why})`; else out.unknownFg = `${tok} (${r.why})`; }
+        continue;
+      }
       if ((m = util.match(/^text-(.+)$/))) {
         const r = utilColor('text', m[1], R, mode);
         if (r.size) out.size = r.size;
@@ -566,8 +587,8 @@ function contrastFile(file, R, layoutBody) {
   for (const mode of modes) {
     const st = bodyEl && !bodyEl.dynamic ? styleOf(bodyEl, mode, R) : {};
     page[mode] = {
-      bg: st.bg && (st.bg.alpha ?? 1) === 1 ? { color: st.bg, from: `<body> ${st.bgFrom}` } : R.token(['--bg', '--color-bg', '--background', '--color-background'], mode) || (mode === 'light' ? { color: parseColor('#ffffff'), from: 'browser default white' } : null),
-      fg: st.fg ? { color: st.fg, from: `<body> ${st.fgFrom}` } : R.token(['--text', '--color-text', '--foreground', '--color-foreground'], mode) || (mode === 'light' ? { color: parseColor('#000000'), from: 'browser default black' } : null),
+      bg: st.bg && (st.bg.alpha ?? 1) === 1 ? { color: st.bg, from: `<body> ${st.bgFrom}` } : R.token(['--bg', '--color-bg', '--background', '--color-background', '--wp-page-bg'], mode) || (mode === 'light' ? { color: parseColor('#ffffff'), from: 'browser default white' } : null),
+      fg: st.fg ? { color: st.fg, from: `<body> ${st.fgFrom}` } : R.token(['--text', '--color-text', '--foreground', '--color-foreground', '--wp-page-fg'], mode) || (mode === 'light' ? { color: parseColor('#000000'), from: 'browser default black' } : null),
     };
   }
   const findings = [], unresolved = [];
@@ -621,6 +642,10 @@ function runContrast(files) {
   let cssFiles = [...files.filter((f) => /\.css$/i.test(f)), ...cssArgs.flatMap((p) => (fs.existsSync(p) ? walk(p).filter((f) => /\.css$/i.test(f)) : []))];
   if (!cssFiles.length) for (const d of S.cssDirs || ['resources/css', 'src']) if (fs.existsSync(d)) cssFiles.push(...walk(d).filter((f) => /\.css$/i.test(f)));
   cssFiles = cssInImportOrder(cssFiles);
+  // WordPress: theme.json comes first (the base palette); the theme's CSS can override its preset variables
+  const tjDirs = [...new Set([...targets, ...cssArgs, ...(S.stack === 'wordpress' ? S.cssDirs || [] : [])].map((t) => (fs.existsSync(t) && fs.statSync(t).isFile() ? path.dirname(t) : t)))];
+  const themeJson = tjDirs.map((d) => path.join(d, 'theme.json')).filter((f, i, a) => fs.existsSync(f) && a.indexOf(f) === i);
+  cssFiles = [...themeJson.map((f) => path.resolve(f)), ...cssFiles];
   const R = loadTheme(cssFiles);
   cssFiles = cssFiles.map((f) => path.relative(process.cwd(), f) || f);
   const pages = files.filter((f) => !/\.css$/i.test(f));
@@ -693,6 +718,8 @@ for (const { target, sub } of renderTargets) {
       const mid = small.filter((x) => Math.min(x.w, x.h) >= 24);
       if (mid.length) once({ file: page, line: 0, sev: 'warn', rule: 'render-target', msg: `${tag} ${mid.length} control(s) between 24 and 44px (house rule 44px): ${mid.slice(0, 5).map((t) => `<${t.el}> "${t.text}" ${t.w}×${t.h}`).join(', ')}${mid.length > 5 ? ' …' : ''}.` });
     }
+    const refs = (run.refs || []).filter((h) => !run.external.some((e) => e.startsWith(h)));
+    if (refs.length) once({ file: page, line: 0, sev: IRAN ? 'error' : 'warn', rule: 'render-foreign-ref', msg: `the rendered page references other hosts in scripts, styles or media (not requested by this browser, but other devices may): ${refs.join(', ')}${IRAN ? ' — they fail or crawl in Iran; remove or self-host them' : ''}.` });
     if (run.external.length) once({ file: page, line: 0, sev: IRAN ? 'error' : 'warn', rule: 'render-external', msg: `the page tried to load from other hosts (blocked during the test): ${[...new Set(run.external)].join(', ')}.` });
   }
   // no-JS view (JavaScript off; no measurement shims): content that disappears or stays empty without JS

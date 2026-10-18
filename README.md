@@ -70,9 +70,9 @@ All output goes into your project (`--out`); the scripts refuse to write into th
 
 ### Self-tests
 ```bash
-node skills/web-ui-playbook/scripts/selftest.mjs      # audit fixtures, --slop, --release, --render, no-JS view (106 checks; 89 without a browser)
-node skills/brand-color-system/scripts/selftest.mjs   # color math, palettes, contrast, token formats (3860 checks)
-node skills/brand-logo-studio/scripts/selftest.mjs    # shaping, bidi, validators, kit export (163 checks; 155 without a browser)
+node skills/web-ui-playbook/scripts/selftest.mjs      # audit fixtures, --slop, --release, --render, no-JS view (114 checks; 96 without a browser)
+node skills/brand-color-system/scripts/selftest.mjs   # color math, palettes, contrast, token formats (3863 checks)
+node skills/brand-logo-studio/scripts/selftest.mjs    # shaping, bidi, validators, kit export (164 checks; 156 without a browser)
 ```
 
 ## Windows notes (tested on Windows 11, Node 24, Chrome)

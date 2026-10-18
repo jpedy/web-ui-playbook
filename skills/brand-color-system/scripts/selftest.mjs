@@ -165,6 +165,16 @@ if (fs.existsSync(auditPath)) {
   const cvRes = JSON.parse(cvCheck.stdout || '{"results":[]}');
   check(cv.status === 0 && !fs.existsSync(path.join(proj, 'v', 'palette.css')) && !/@theme/.test(cvCss) && /@media \(prefers-color-scheme: dark\)/.test(cvCss) && /\.dark, \[data-theme="dark"\]/.test(cvCss), '--format css-variables: plain CSS (no @theme), dark from the system setting and from .dark / data-theme');
   check(cvRes.results.length >= 40 && cvRes.results.every((r) => r.pass !== false) && new Set(cvRes.results.map((r) => r.mode)).size === 2, `css-variables: check-contrast reads it independently — ${cvRes.results.length} pairs, light and dark, all pass`);
+  const wpo = run(['--format', 'wordpress', '--out', path.join(proj, 'wp')]);
+  const tjp = path.join(proj, 'wp', 'theme.palette.json');
+  const tj = fs.existsSync(tjp) ? JSON.parse(fs.readFileSync(tjp, 'utf8')) : null;
+  const wpJ = fs.existsSync(path.join(proj, 'wp', 'palette.json')) ? readJ('wp') : null;
+  const slugs = (tj?.settings?.color?.palette || []).map((c) => c.slug);
+  check(wpo.status === 0 && tj?.version === 3 && slugs.includes('contrast') && !slugs.includes('text') && tj.settings.color.palette.find((c) => c.slug === 'primary')?.color === wpJ?.tokens.light.primary, 'wordpress format: theme.json v3 palette with the checked colors; text color slug is "contrast" (not "text" — WordPress\'s has-text-color marker)');
+  check(tj?.styles?.elements?.button?.color?.background === 'var:preset|color|primary' && tj?.styles?.color?.text === 'var:preset|color|contrast', 'wordpress format: styles reference presets (var:preset|color|…) for page, links and buttons');
+  const darkVar = fs.existsSync(path.join(proj, 'wp', 'styles', 'dark.json')) ? JSON.parse(fs.readFileSync(path.join(proj, 'wp', 'styles', 'dark.json'), 'utf8')) : null;
+  const darkCss = fs.existsSync(path.join(proj, 'wp', 'palette.wp-dark.css')) ? fs.readFileSync(path.join(proj, 'wp', 'palette.wp-dark.css'), 'utf8') : '';
+  check(darkVar?.title === 'Dark' && darkVar.settings.color.palette.find((c) => c.slug === 'contrast')?.color === wpJ?.tokens.dark.text && /@media \(prefers-color-scheme: dark\)[\s\S]*html:root[\s\S]*--wp--preset--color--contrast/.test(darkCss), 'wordpress format: a Dark style variation (styles/dark.json) and system-dark CSS overriding the preset variables');
   const bad = run(['--format', 'nope', '--out', path.join(proj, 'x')]);
   check(bad.status === 2 && /available: /.test(bad.stderr) && !fs.existsSync(path.join(proj, 'x')), 'an unknown --format is refused (with the list) before anything is written');
   if (fs.existsSync(path.join(DIR, '..', '..', 'web-ui-playbook', 'scripts', 'profile.mjs'))) {

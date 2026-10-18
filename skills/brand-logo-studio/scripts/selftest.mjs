@@ -220,6 +220,9 @@ if (chrome) {
   const enOnly = async (layout) => (await lockup({ layout, mode: 'color', colors: fxB.colors, icon: 'R1_monogram', letter: 'M', letterFont: 'vazirmatn-black', accentDots: 'none', fa: null, en: { text: 'Mira Holt', font: 'inter:800' } })).svg;
   const okEn = await Promise.all(['h-ltr', 'wordmark-en', 'icon'].map((l) => enOnly(l).then((s) => /<path/.test(s)).catch(() => false)));
   check(okEn.every(Boolean), `English-only brand: h-ltr, wordmark-en and icon lockups render (got ${okEn.join(', ')})`);
+  fs.writeFileSync(path.join(kitDir, 'png', 'icon-512.png'), 'ICON512');
+  const wf = Object.fromEntries(integrationFor('wordpress').files({ c: { primary: '#0d9488', darkBg: '#060807' }, brief: { name: { fa: 'زبان‌سرا', en: 'Zabansara' } }, out: kitDir }));
+  check(String(wf['wordpress/site-icon-512.png']) === 'ICON512' && /add_theme_support\( 'custom-logo'/.test(wf['wordpress/functions-snippet.php']) && /theme-color/.test(wf['wordpress/functions-snippet.php']) && /Site Icon/.test(wf['wordpress/README.md']), 'stack wordpress: a 512px Site Icon to upload (WordPress makes the sizes), custom-logo + theme-color snippet, README');
   check(integrationFor('wix-or-unknown').stack === 'laravel', 'unknown stack falls back to the Laravel integration (the original default)');
   fs.rmSync(kitDir, { recursive: true, force: true });
 }
