@@ -6,9 +6,10 @@
  */
 import * as markup from './markup.mjs';
 import * as jsx from './jsx.mjs';
+import * as tier2 from './tier2.mjs';
 
 /** Files the audit reads. */
-export const EXT = /\.(html?|blade\.php|jsx|tsx|vue|css)$/i;
+export const EXT = /\.(html?|blade\.php|jsx|tsx|vue|svelte|astro|css)$/i;
 
 const KIND = [
   [/\.css$/i, 'css'],
@@ -17,9 +18,13 @@ const KIND = [
   [/\.(jsx|tsx)$/i, 'jsx'],
   [/\.php$/i, 'php'], // WordPress templates (read only when the stack is wordpress — see audit.mjs walk)
   [/\.vue$/i, 'vue'],
+  [/\.svelte$/i, 'svelte'],
+  [/\.astro$/i, 'astro'],
 ];
 const READERS = {
   jsx: { classLists: jsx.classLists, visibleText: jsx.visibleText, isTextSegment: jsx.isTextSegment, isTagAt: jsx.isTagAt },
+  svelte: tier2.svelte, // best effort (Tier 2)
+  astro: tier2.astro,
 };
 
 /** → { name, isCss, isPage, isLayout, stripComments, visibleText, classLists, isTextSegment, parseEl, TAG_RE, VOID } */

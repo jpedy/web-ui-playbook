@@ -175,6 +175,13 @@ if (fs.existsSync(auditPath)) {
   const darkVar = fs.existsSync(path.join(proj, 'wp', 'styles', 'dark.json')) ? JSON.parse(fs.readFileSync(path.join(proj, 'wp', 'styles', 'dark.json'), 'utf8')) : null;
   const darkCss = fs.existsSync(path.join(proj, 'wp', 'palette.wp-dark.css')) ? fs.readFileSync(path.join(proj, 'wp', 'palette.wp-dark.css'), 'utf8') : '';
   check(darkVar?.title === 'Dark' && darkVar.settings.color.palette.find((c) => c.slug === 'contrast')?.color === wpJ?.tokens.dark.text && /@media \(prefers-color-scheme: dark\)[\s\S]*html:root[\s\S]*--wp--preset--color--contrast/.test(darkCss), 'wordpress format: a Dark style variation (styles/dark.json) and system-dark CSS overriding the preset variables');
+  const sd = run(['--format', 'scss,dtcg', '--out', path.join(proj, 'sd')]);
+  const scssTxt = fs.existsSync(path.join(proj, 'sd', '_palette.scss')) ? fs.readFileSync(path.join(proj, 'sd', '_palette.scss'), 'utf8') : '';
+  const tok = fs.existsSync(path.join(proj, 'sd', 'palette.tokens.json')) ? JSON.parse(fs.readFileSync(path.join(proj, 'sd', 'palette.tokens.json'), 'utf8')) : null;
+  const sdJ = fs.existsSync(path.join(proj, 'sd', 'palette.json')) ? readJ('sd') : null;
+  check(sd.status === 0 && new RegExp(`\\$primary: ${sdJ?.tokens.light.primary};`).test(scssTxt) && /\$palette-dark: \(/.test(scssTxt) && /@mixin palette-vars/.test(scssTxt), 'scss format: role variables, light/dark maps and the custom-property mixin');
+  const tv = tok?.color?.light?.primary?.$value;
+  check(tok?.color?.$type === 'color' && tv?.colorSpace === 'oklch' && tv.components.length === 3 && tv.components[0] >= 0 && tv.components[0] <= 1 && tv.components[2] >= 0 && tv.components[2] < 360 && tv.hex === sdJ?.tokens.light.primary && tok.color.dark.text.$value.hex === sdJ?.tokens.dark.text, 'dtcg format: DTCG 2025.10 color objects (oklch, L 0–1, hue 0–360, hex fallback) for scales and light/dark roles');
   const bad = run(['--format', 'nope', '--out', path.join(proj, 'x')]);
   check(bad.status === 2 && /available: /.test(bad.stderr) && !fs.existsSync(path.join(proj, 'x')), 'an unknown --format is refused (with the list) before anything is written');
   if (fs.existsSync(path.join(DIR, '..', '..', 'web-ui-playbook', 'scripts', 'profile.mjs'))) {

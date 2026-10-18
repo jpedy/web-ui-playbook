@@ -95,6 +95,11 @@ export const INTEGRATIONS = {
   },
 };
 
+// Tier 2 / Tier 3 stacks (web-ui-playbook references/stacks/README.md) get the plain HTML head tags
+const AS_STATIC = ['next-pages', 'nuxt', 'vue', 'sveltekit', 'svelte', 'astro', 'react-spa', 'shopify', 'builder'];
+
 export function integrationFor(stack) {
-  return INTEGRATIONS[stack] ? { stack, ...INTEGRATIONS[stack] } : { stack: 'laravel', ...INTEGRATIONS.laravel };
+  if (INTEGRATIONS[stack]) return { stack, ...INTEGRATIONS[stack] };
+  if (AS_STATIC.includes(stack)) return { stack, ...INTEGRATIONS.static, install: `${INTEGRATIONS.static.install} (${stack}: put the kit in the framework's static folder — public/ or static/ — and the tags in its document head; web-ui-playbook references/stacks/tier2-frameworks.md or builders.md).` };
+  return { stack: 'laravel', ...INTEGRATIONS.laravel };
 }

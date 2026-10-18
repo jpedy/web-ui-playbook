@@ -23,7 +23,8 @@
  *                            (data: references/iran-brand-colors.md, dated — verify) · global: no market table
  *   --format <list>          token files to write, comma-separated (default tailwind4): tailwind4 (palette.css),
  *                            css-variables (palette.vars.css — plain CSS), shadcn (palette.shadcn.css — shadcn/ui names),
- *                            wordpress (theme.palette.json + styles/dark.json + palette.wp-dark.css — theme.json v3)
+ *                            wordpress (theme.palette.json + styles/dark.json + palette.wp-dark.css — theme.json v3),
+ *                            scss (_palette.scss), dtcg (palette.tokens.json — DTCG 2025.10 design tokens)
  *                            — formats per stack: web-ui-playbook references/stacks/<stack>.md
  *   Without --lang / --market, the project's .web-ui-playbook.json (web-ui-playbook profile) supplies them.
  *   --competitor "<hex>[:Name]"   extra competitor color (repeatable)

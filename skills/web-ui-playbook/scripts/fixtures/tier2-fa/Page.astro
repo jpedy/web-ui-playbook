@@ -1,0 +1,9 @@
+---
+const heading = "تیتری که در فرانت‌متر است";
+const items = ["یک", "دو"];
+---
+<!-- Fixture (selftest §3h): Astro. Expected: frontmatter is not text; "pr-4" inside class:list is found. -->
+<html lang="fa" dir="rtl"><body class="bg-bg text-text">
+  <h1 class:list={["text-3xl font-bold", "pr-4"]}>{heading} صفحهٔ آزمایشی برای خواندن آسترو</h1>
+  <p class="text-muted">متن ساده برای بررسی کنتراست در صفحهٔ آسترو</p>
+</body></html>

@@ -6,9 +6,11 @@
  *   css-variables  palette.vars.css — plain CSS custom properties, OS dark mode + .dark/[data-theme] (static HTML, WordPress classic, any CSS)
  *   shadcn      palette.shadcn.css — shadcn/ui variable names (Next.js + shadcn, Inertia + React + shadcn)
  *   wordpress   theme.palette.json (theme.json v3 palette + styles), styles/dark.json (style variation), palette.wp-dark.css
+ *   scss        _palette.scss — role variables, light/dark maps, a custom-property mixin
+ *   dtcg        palette.tokens.json — Design Tokens Community Group 2025.10 (OKLCH + hex fallback)
  * Which format a stack uses: web-ui-playbook references/stacks/<stack>.md ("Where tokens live").
  */
-import { cssOklch, fmtRatio, contrast, parseColor } from './color-core.mjs';
+import { cssOklch, fmtRatio, contrast, parseColor, hexToOklch } from './color-core.mjs';
 
 export const ORDER = ['bg', 'surface', 'surface-subtle', 'border', 'border-strong', 'text', 'muted',
   'primary', 'primary-hover', 'primary-fg', 'primary-subtle', 'primary-ink', 'brand', 'accent', 'accent-fg',
@@ -217,6 +219,44 @@ ${WP_SLUGS.map((t) => `    --wp--preset--color--${wpSlug(t)}: ${p.tokens.dark[t]
 }
 `;
 
+/** SCSS: one variable per role (light), light/dark maps and a mixin that writes the CSS custom properties. */
+function scss(p) {
+  const map = (mode) => ORDER.map((t) => `  '${t}': ${p.tokens[mode][t]},`).join('\n');
+  return `// Brand palette — ${p.meta.name} — SCSS (generate-palette.mjs --format scss, ${p.meta.generated})
+// Every pair was checked (WCAG 2.2 AA${p.meta.fa ? '; Persian small text ≥ 5.5:1 house rule' : ''}) — palette-report.md.
+// Use: @use 'palette' as *;  then color: $text;  or  :root { @include palette-vars(light); } .dark { @include palette-vars(dark); }
+
+${ORDER.map((t) => `$${t}: ${p.tokens.light[t]}; // ${ROLE[t] || ''}`).join('\n')}
+
+$palette-light: (
+${map('light')}
+);
+$palette-dark: (
+${map('dark')}
+);
+
+@mixin palette-vars($mode: light) {
+  $m: if($mode == dark, $palette-dark, $palette-light);
+  @each $name, $value in $m { --#{$name}: #{$value}; }
+}
+`;
+}
+
+/** Design Tokens (DTCG 2025.10 format + color module): OKLCH components with a hex fallback; scales and light/dark roles. */
+function dtcg(p) {
+  const r = (x, d) => Number(x.toFixed(d));
+  const color = (hex, description) => {
+    const { l, c, h } = hexToOklch(hex);
+    return { $value: { colorSpace: 'oklch', components: [r(l, 4), r(c, 4), r(Number.isFinite(h) ? ((h % 360) + 360) % 360 : 0, 2)], alpha: 1, hex }, ...(description ? { $description: description } : {}) };
+  };
+  const scale = (s) => Object.fromEntries(s.map((x) => [String(x.stop), color(x.hex, x.anchored ? 'exact brand color' : undefined)]));
+  const roles = (mode) => Object.fromEntries(ORDER.map((t) => [t, color(p.tokens[mode][t], ROLE[t])]));
+  return JSON.stringify({
+    $description: `Brand palette — ${p.meta.name}, generated ${p.meta.generated} by brand-color-system (every pair checked: palette-report.md). Format: Design Tokens Community Group 2025.10; media type application/design-tokens+json.`,
+    color: { $type: 'color', brand: scale(p.scales.brand), ...(p.scales.accent !== p.scales.brand ? { accent: scale(p.scales.accent) } : {}), base: scale(p.scales.base), light: roles('light'), dark: roles('dark') },
+  }, null, 2);
+}
+
 /** name → { file, build(p) → text, extra?(p) → [[name, text]], install: plain-words first step for palette-report.md } */
 export const FORMATS = {
   tailwind4: {
@@ -229,6 +269,16 @@ export const FORMATS = {
     build: wpThemeJson,
     extra: (p) => [['styles/dark.json', wpDarkVariation(p)], ['palette.wp-dark.css', wpDarkCss(p)]],
     install: 'WordPress block theme: merge `settings.color` and `styles` from `theme.palette.json` into your theme.json (version 3), copy `styles/dark.json` into the theme (a Dark style variation users can pick) and, for dark mode that follows the visitor\x27s system setting, enqueue `palette.wp-dark.css` after the global styles. Blocks then use classes such as has-primary-background-color (text color: has-contrast-color).',
+  },
+  scss: {
+    file: '_palette.scss',
+    build: scss,
+    install: 'SCSS: copy `_palette.scss` into your styles folder, `@use \'palette\' as *;`, then use the role variables (`$text`, `$primary`…) or write the custom properties with `@include palette-vars(light)` / `palette-vars(dark)`.',
+  },
+  dtcg: {
+    file: 'palette.tokens.json',
+    build: dtcg,
+    install: 'Design tokens (DTCG 2025.10): import `palette.tokens.json` into your token tool (Style Dictionary, Tokens Studio, Figma variables…); `color.light.*` and `color.dark.*` are the checked roles, `color.brand/accent/base` the scales.',
   },
   'css-variables': {
     file: 'palette.vars.css',

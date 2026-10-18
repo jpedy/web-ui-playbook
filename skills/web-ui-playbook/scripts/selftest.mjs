@@ -162,6 +162,12 @@ const notWp = (() => { const r = spawnSync(process.execPath, [AUDIT, '.', '--jso
 fs.rmSync(plainDir, { recursive: true, force: true });
 check(notWp.files === 0, 'without stack wordpress, .php files are not audited (Laravel apps keep their PHP classes out)');
 
+// 3h. Tier 2 readers (best effort): Svelte expressions / Astro frontmatter are not text; class:list literals are read
+const t2 = audit([path.join(FX, 'tier2-fa'), '--contrast', '--css', path.join(DIR, '..', 'assets', 'tokens.css'), '--market', 'global']);
+const t2pd = (t2.findings || []).filter((f) => f.rule === 'physical-direction').map((f) => f.msg).join(' ');
+check(t2.files === 2 && /"ml-2"/.test(t2pd) && /"pr-4"/.test(t2pd), 'Svelte and Astro files are read: classes in class="" and in Astro class:list={[…]} are checked');
+check(t2.contrast?.unresolved.length === 4 && t2.contrast.unresolved.every((u) => u.reason === 'dynamic-class') && !(t2.findings || []).some((f) => /^(zwnj|fa-)/.test(f.rule) && /تیتر/.test(f.msg)), 'Svelte class:x={…} and Astro class:list are dynamic (never passed); script and frontmatter strings are not page text');
+
 // 3d. progressive disclosure: SKILL.md stays short; every stack adapter has the template's headings
 const skill = fs.readFileSync(path.join(DIR, '..', 'SKILL.md'), 'utf8');
 const desc = (skill.match(/^description: (.*)$/m) || [])[1] || '';

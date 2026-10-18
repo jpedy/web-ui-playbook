@@ -38,6 +38,13 @@
 - Audit: `.php` templates for stack `wordpress` only; `theme.json` presets and `has-{slug}-color` classes in `--contrast`; `<html <?php language_attributes(); ?>>` counts as `lang` + `dir`; equal left/right spacing is direction-neutral (WordPress block spacing); `--render` rewrites a local server's absolute URLs to the audit origin.
 - **`--render` foreign references** (all stacks): foreign hosts a rendered page references in scripts, styles, media and inline data are reported even when this browser did not fetch them (error for market Iran) — the site's own domain and JSON lists of registered `.js`/`.css` files are not counted.
 
+### Tier 2 (guided) and Tier 3 (detect and warn)
+- **`references/stacks/tier2-frameworks.md`** — Nuxt 4, Vue + Vite, SvelteKit / Svelte, Astro 7, React + Vite SPA (with the client-rendering SEO / slow-network warning) and the Next.js Pages Router: where tokens, fonts, icons and `lang`/`dir` go, verified 2026-10-18 where stated (⚠ marks the rest). Guided only — no test projects.
+- **`references/stacks/builders.md`** — Shopify, Wix, Webflow, Elementor-only, Squarespace, Framer: what the plugin can do (spec, checked color values, logo files, rendered checks on a saved page) and what it cannot; market Iran caveats.
+- Audit reads `.svelte` and `.astro` at best-effort level (`{expressions}` and frontmatter are not text; `class:` directives and `class:list` are dynamic; `class:list` literals are checked).
+- `generate-palette.mjs --format scss` (`_palette.scss`) and `--format dtcg` (`palette.tokens.json`, Design Tokens Community Group 2025.10 color objects in OKLCH with a hex fallback — verified against the published color module).
+- Logo kit: Tier 2/3 stacks get the plain `head-snippet.html`.
+
 ### Internal
 - Markup readers moved to `scripts/parsers/` unchanged (each audit rule exists once for every stack).
 - `performance-and-tech.md` is stack-neutral now; Laravel setup, Blade components, Livewire/Filament/Inertia notes moved to `references/stacks/laravel.md` (updated to current versions).

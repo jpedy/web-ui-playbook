@@ -223,6 +223,7 @@ if (chrome) {
   fs.writeFileSync(path.join(kitDir, 'png', 'icon-512.png'), 'ICON512');
   const wf = Object.fromEntries(integrationFor('wordpress').files({ c: { primary: '#0d9488', darkBg: '#060807' }, brief: { name: { fa: 'زبان‌سرا', en: 'Zabansara' } }, out: kitDir }));
   check(String(wf['wordpress/site-icon-512.png']) === 'ICON512' && /add_theme_support\( 'custom-logo'/.test(wf['wordpress/functions-snippet.php']) && /theme-color/.test(wf['wordpress/functions-snippet.php']) && /Site Icon/.test(wf['wordpress/README.md']), 'stack wordpress: a 512px Site Icon to upload (WordPress makes the sizes), custom-logo + theme-color snippet, README');
+  check(['nuxt', 'sveltekit', 'astro', 'shopify', 'builder'].every((s) => 'head-snippet.html' in Object.fromEntries(integrationFor(s).files({ c: { primary: '#0d9488', darkBg: '#060807' }, brief: { name: { en: 'X' } } }))), 'Tier 2/3 stacks get the plain HTML head snippet');
   check(integrationFor('wix-or-unknown').stack === 'laravel', 'unknown stack falls back to the Laravel integration (the original default)');
   fs.rmSync(kitDir, { recursive: true, force: true });
 }

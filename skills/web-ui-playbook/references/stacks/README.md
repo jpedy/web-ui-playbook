@@ -38,3 +38,5 @@ An adapter that is not written yet: follow the core files, tell the user plainly
 | `next.md` | Next.js 16 App Router (TypeScript), shadcn/ui, next-intl | Tier 1 — test projects #1 (fa, Iran) and #2 (en, global) passed |
 | `static-html.md` | HTML/CSS/JS without a framework (CSS variables or Tailwind CLI) | Tier 1 — test project #4 |
 | `wordpress.md` | WordPress 7.1 block and classic themes, WooCommerce basics | Tier 1 — test projects #3 and #3b passed in WordPress Playground (not real hosting) |
+| `tier2-frameworks.md` | Vue/Nuxt, Svelte/SvelteKit, Astro, React + Vite SPA, Next.js Pages Router | Tier 2 — guided, not tested |
+| `builders.md` | Shopify, Wix, Webflow, Elementor-only, Squarespace, Framer | Tier 3 — detect and warn |
