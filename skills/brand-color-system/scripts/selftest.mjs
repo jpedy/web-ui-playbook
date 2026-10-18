@@ -138,5 +138,27 @@ if (fs.existsSync(auditPath)) {
   fs.rmSync(proj, { recursive: true, force: true });
 } else console.log('(web-ui-playbook not installed next to this skill — audit.mjs checks skipped)');
 
+// 7. token formats, market and the project profile (.web-ui-playbook.json)
+{
+  const gp = path.join(DIR, 'generate-palette.mjs');
+  const proj = fs.mkdtempSync(path.join(os.tmpdir(), 'bcs-prof-'));
+  const run = (args) => spawnSync(process.execPath, [gp, '--brand', '#0d9488', ...args], { encoding: 'utf8', cwd: proj });
+  const readJ = (d) => JSON.parse(fs.readFileSync(path.join(proj, d, 'palette.json'), 'utf8'));
+  const g = run(['--market', 'global', '--out', path.join(proj, 'g')]);
+  check(g.status === 0 && fs.existsSync(path.join(proj, 'g', 'palette.css')), '--market global is accepted (no Iranian brand table)');
+  const bad = run(['--format', 'nope', '--out', path.join(proj, 'x')]);
+  check(bad.status === 2 && /available: /.test(bad.stderr) && !fs.existsSync(path.join(proj, 'x')), 'an unknown --format is refused (with the list) before anything is written');
+  if (fs.existsSync(path.join(DIR, '..', '..', 'web-ui-playbook', 'scripts', 'profile.mjs'))) {
+    fs.writeFileSync(path.join(proj, '.web-ui-playbook.json'), JSON.stringify({ version: 1, stack: 'laravel', languages: ['fa'], dir: 'rtl', market: 'iran' }));
+    const pr = run(['--out', path.join(proj, 'p')]);
+    const pj = readJ('p');
+    check(pr.status === 0 && pj.meta.inputs.lang === 'fa' && pj.meta.inputs.market === 'iran' && pj.meta.fa === true, 'without --lang/--market the project profile supplies them (fa → 5.5:1 house rule; iran → brand table)');
+    const fl = run(['--lang', 'en', '--market', 'global', '--out', path.join(proj, 'f')]);
+    const fj = readJ('f');
+    check(fl.status === 0 && fj.meta.inputs.lang === 'en' && fj.meta.inputs.market === 'global' && !fj.meta.fa, 'command-line flags override the profile');
+  }
+  fs.rmSync(proj, { recursive: true, force: true });
+}
+
 console.log(`\nselftest: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

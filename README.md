@@ -60,7 +60,7 @@ node <plugin>/skills/brand-logo-studio/scripts/export-kit.mjs --brief brand/brie
 All output goes into your project (`--out`); the scripts refuse to write into the plugin folder.
 
 ### Audit modes
-- **default** — RTL/logical properties, Persian text hygiene, foreign hosts, accessibility basics, placeholders.
+- **default** — RTL/logical properties, Persian text hygiene, foreign hosts (errors when the project's market is Iran — `.web-ui-playbook.json` or `--iran`; warnings otherwise), accessibility basics, placeholders.
 - **`--contrast`** — every text element against its background in light and dark, from your tokens. Pairs it cannot determine (dynamic classes, components, background images) are listed as "could not resolve" and **never counted as passed**.
 - **`--slop`** — generic-page tells as warnings (stock phrases and generic buttons from `scripts/data/fa-slop.json`, layout and motion habits), and the list of claims for you to confirm. Allow a phrase or rule in your project with `.slop-allow.json`.
 - **`--render <page.html>`** — opens a built page in your installed Chrome/Edge (headless, local server, network blocked) and measures what the browser really shows after Alpine/JS ran: contrast in light and dark, overflow and headline lines at 1440 / 768 / 375 px, fonts that loaded, requests that tried to leave the machine. Blade must be rendered to HTML first (save the page Laravel serves).
@@ -70,9 +70,9 @@ All output goes into your project (`--out`); the scripts refuse to write into th
 
 ### Self-tests
 ```bash
-node skills/web-ui-playbook/scripts/selftest.mjs      # audit fixtures, --slop, --release, --render, no-JS view (62 checks; 51 without a browser)
-node skills/brand-color-system/scripts/selftest.mjs   # color math, palettes, contrast (3850 checks)
-node skills/brand-logo-studio/scripts/selftest.mjs    # shaping, bidi, validators, kit export (154 checks; 146 without a browser)
+node skills/web-ui-playbook/scripts/selftest.mjs      # audit fixtures, --slop, --release, --render, no-JS view (90 checks; 79 without a browser)
+node skills/brand-color-system/scripts/selftest.mjs   # color math, palettes, contrast, token formats (3854 checks)
+node skills/brand-logo-studio/scripts/selftest.mjs    # shaping, bidi, validators, kit export (158 checks; 150 without a browser)
 ```
 
 ## Windows notes (tested on Windows 11, Node 24, Chrome)

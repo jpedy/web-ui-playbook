@@ -19,8 +19,11 @@
  *   --on-primary <m>         auto (default) | white | dark — label color on buttons
  *   --anchor-stop <stop>     force the brand color onto a stop (50…950)
  *   --lang <l>               en (default) | fa | both — fa/both apply the 5.5:1 house rule to small text
- *   --market iran            also warn when the brand is close to a well-known Iranian brand
- *                            (data: references/iran-brand-colors.md, dated — verify)
+ *   --market <m>             iran: also warn when the brand is close to a well-known Iranian brand
+ *                            (data: references/iran-brand-colors.md, dated — verify) · global: no market table
+ *   --format <list>          token files to write, comma-separated (default tailwind4): tailwind4 (palette.css)
+ *                            — formats per stack: web-ui-playbook references/stacks/<stack>.md
+ *   Without --lang / --market, the project's .web-ui-playbook.json (web-ui-playbook profile) supplies them.
  *   --competitor "<hex>[:Name]"   extra competitor color (repeatable)
  *   --name <text>            project name for the report
  *   --out <dir>              output folder (default: ./brand-colors in the current folder)
@@ -34,6 +37,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { STOPS, cssOklch, fmtRatio } from './color-core.mjs';
 import { buildPalette, parseBrandTable } from './palette-engine.mjs';
+import { FORMATS, ORDER, ROLE } from './formats.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SKILL_DIR = path.resolve(SCRIPT_DIR, '..');
@@ -61,12 +65,24 @@ if (opts.help || argv.length === 0) {
   process.exit(argv.length === 0 ? 2 : 0);
 }
 for (const k of ['hue', 'chroma', 'lightness']) if (opts[k] != null) opts[k] = Number(opts[k]);
+// project profile (web-ui-playbook/scripts/profile.mjs): language and market when the flags don't give them
+if (opts.lang == null || opts.market == null) {
+  try {
+    const { loadProfile } = await import('../../web-ui-playbook/scripts/profile.mjs');
+    const prof = loadProfile({ start: process.cwd() });
+    const pl = prof?.data?.languages;
+    if (opts.lang == null && Array.isArray(pl) && pl.length) { opts.lang = pl.length > 1 ? 'both' : pl[0]; opts.profile = prof.file; }
+    if (opts.market == null && prof?.data?.market) { opts.market = prof.data.market; opts.profile = prof.file; }
+  } catch { /* web-ui-playbook not installed next to this skill: flags only */ }
+}
 if (opts.lang && !['en', 'fa', 'both'].includes(opts.lang)) { console.error('--lang must be en, fa or both'); process.exit(2); }
 
 if (opts.market === 'iran') {
   const table = fs.readFileSync(path.join(SKILL_DIR, 'references', 'iran-brand-colors.md'), 'utf8');
   opts.competitors.push(...parseBrandTable(table));
-} else if (opts.market) { console.error(`Unknown --market "${opts.market}" (only "iran" is available).`); process.exit(2); }
+} else if (opts.market && opts.market !== 'global') { console.error(`Unknown --market "${opts.market}" (use iran or global).`); process.exit(2); }
+const formats = String(opts.format || 'tailwind4').split(',').map((f) => f.trim()).filter(Boolean);
+for (const f of formats) if (!FORMATS[f]) { console.error(`Unknown --format "${f}" (available: ${Object.keys(FORMATS).join(', ')}).`); process.exit(2); }
 
 // ---------- output folder (never inside the plugin/skill) ----------
 const norm = (p) => (process.platform === 'win32' ? path.resolve(p).toLowerCase() : path.resolve(p));
@@ -85,62 +101,9 @@ let p;
 try { p = buildPalette({ ...opts, anchorStop: opts.anchorStop != null ? Number(opts.anchorStop) : null }); }
 catch (e) { console.error(e.message); process.exit(2); }
 
-// ---------- writers ----------
-const ORDER = ['bg', 'surface', 'surface-subtle', 'border', 'border-strong', 'text', 'muted',
-  'primary', 'primary-hover', 'primary-fg', 'primary-subtle', 'primary-ink', 'brand', 'accent', 'accent-fg',
-  'success', 'success-subtle', 'warning', 'warning-subtle', 'danger', 'danger-subtle', 'info', 'info-subtle', 'focus'];
-const ROLE = {
-  bg: 'page background', surface: 'cards, inputs', 'surface-subtle': 'hover rows, wells', border: '1px dividers (decorative)',
-  'border-strong': 'input/checkbox borders (≥ 3:1)', text: 'body text and headings', muted: 'secondary text',
-  primary: 'main button fill', 'primary-hover': 'main button hover', 'primary-fg': 'text on primary buttons',
-  'primary-subtle': 'selected/active background', 'primary-ink': 'brand-colored text and links', brand: 'exact brand color: logo, illustrations, large headings',
-  accent: 'highlights, badges (≤ 10% of the screen)', 'accent-fg': 'text on accent', focus: 'focus ring',
-  success: 'success text/icons', 'success-subtle': 'success background', warning: 'warning text/icons', 'warning-subtle': 'warning background',
-  danger: 'error text/icons', 'danger-subtle': 'error background', info: 'info text/icons', 'info-subtle': 'info background',
-};
-const worst = (mode, tok) => {
-  const rows = p.matrix.filter((m) => m.mode === mode && m.fg === tok && m.kind !== 'decor');
-  if (!rows.length) return '';
-  const w = rows.reduce((a, b) => (a.ratio < b.ratio ? a : b));
-  return ` · ${fmtRatio(w.ratio)}:1 on ${w.bg}`;
-};
-const decl = (name, hex, mode) => `  --${name}: ${cssOklch(hex)}; /* ${hex} ${ROLE[name] || ''}${worst(mode, name)} */`;
-const scaleDecl = (prefix, scale) => scale.map((s) => `  --color-${prefix}-${s.stop}: ${cssOklch(s.hex)}; /* ${s.hex}${s.anchored ? ' ← exact' : ''} */`).join('\n');
-
-const css = `/* ==========================================================================
-   Brand palette — ${p.meta.name}
-   Generated ${p.meta.generated} by brand-color-system/scripts/generate-palette.mjs
-   Brand color ${p.brand.hex} kept exactly as brand-${p.brand.stop}.
-   Every text/background pair below was checked (WCAG 2.2 AA${p.meta.fa ? '; Persian small text ≥ 5.5:1 house rule' : ''}) —
-   see palette-report.md.
-
-   Use with web-ui-playbook: copy this file next to tokens.css and import it AFTER the tokens:
-     @import "./tokens.css";
-     @import "./palette.css";
-   It only defines colors (no @import "tailwindcss"); later definitions win.
-   Templates keep using semantic classes: bg-primary text-primary-fg hover:bg-primary-hover,
-   text-primary-ink for brand-colored links, bg-brand only for logo/illustration areas.
-   ========================================================================== */
-
-:root {
-${ORDER.map((t) => decl(t, p.tokens.light[t], 'light')).join('\n')}
-}
-
-.dark {
-${ORDER.map((t) => decl(t, p.tokens.dark[t], 'dark')).join('\n')}
-  color-scheme: dark;
-}
-
-@theme inline {
-${ORDER.map((t) => `  --color-${t}: var(--${t});`).join('\n')}
-}
-
-/* Full scales for rare cases (charts, illustrations). Prefer the semantic tokens above in templates. */
-@theme {
-${scaleDecl('brand', p.scales.brand)}
-${p.scales.accent !== p.scales.brand ? scaleDecl('accent', p.scales.accent) + '\n' : ''}${scaleDecl('base', p.scales.base)}
-}
-`;
+// ---------- writers (token formats: formats.mjs) ----------
+const css = FORMATS.tailwind4.build(p); // also feeds the preview page
+const outputs = formats.map((f) => [FORMATS[f].file, f === 'tailwind4' ? css : FORMATS[f].build(p)]);
 
 const rnd = (x, d = 2) => Number(x.toFixed(d));
 const json = {
@@ -171,7 +134,7 @@ ${p.decisions.map((d) => `- ${d}`).join('\n')}
 ${p.warnings.length ? p.warnings.map((w) => `- ⚠ ${w}`).join('\n') : '- None.'}
 
 ## How to use it
-1. Copy \`palette.css\` next to \`tokens.css\` (web-ui-playbook) and add \`@import "./palette.css";\` right after the tokens import.
+1. ${FORMATS[formats[0]].install}${formats.length > 1 ? ` Also written: ${formats.slice(1).map((f) => `\`${FORMATS[f].file}\``).join(', ')}.` : ''}
 2. Keep using semantic classes: \`bg-primary text-primary-fg hover:bg-primary-hover\` for main buttons, \`text-primary-ink\` for brand-colored links, \`text-muted\` for secondary text, \`bg-success-subtle text-success\` for alerts (always with an icon and a word).
 3. Use \`bg-brand\` / \`text-brand\` only for the logo, illustrations and big headings — it is decoration, not a button color${p.tokens.light.primary !== p.tokens.light.brand ? ' (your buttons use a different shade, see above)' : ''}.
 4. After building pages, run the contrast check: \`node <skill>/scripts/check-contrast.mjs resources/css/palette.css${p.meta.fa ? ' --fa' : ''}\`, and the page audit \`node <web-ui-playbook>/scripts/audit.mjs resources/views --contrast\`.
@@ -259,7 +222,7 @@ ${p.warnings.length ? `<h3>Warnings</h3><ul>${p.warnings.map((d) => `<li>${esc(d
 `;
 
 fs.mkdirSync(outDir, { recursive: true });
-const files = { 'palette.css': css, 'palette.json': JSON.stringify(json, null, 2), 'palette-report.md': report, 'palette-preview.html': preview };
+const files = { ...Object.fromEntries(outputs), 'palette.json': JSON.stringify(json, null, 2), 'palette-report.md': report, 'palette-preview.html': preview };
 for (const [f, content] of Object.entries(files)) fs.writeFileSync(path.join(outDir, f), content);
 
 // ---------- console summary ----------

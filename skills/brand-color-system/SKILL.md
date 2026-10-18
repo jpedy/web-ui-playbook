@@ -15,10 +15,10 @@ You choose colors for a user with **no design background**. They give a brand co
 1. **Do you already have a brand color?** (a hex code, or a logo file to read it from, or "no")
 2. **What is the business and who is it for?** (skip if known from web-ui-playbook intake) — it sets `--industry`, which picks the accent
 3. **Feel?** Offer 3 fitting options from `references/industry-feel-lookup.md` §1, e.g. "trustworthy / calm / playful".
-4. **Persian / users inside Iran?** (decides `--lang fa` and `--market iran`)
+4. **Language and market** — read from the project's `.web-ui-playbook.json` when it exists (the script does this itself); otherwise ask: Persian text? users inside Iran? (`--lang fa|en|both`, `--market iran|global` — two separate switches)
 5. **Any competitor colors to stay away from?** (optional; known Iranian brands are checked automatically with `--market iran`)
 
-If the user says "you decide": use their brand color if any, otherwise the feel from the industry table; Persian + `--market iran` when the request is in Persian or mentions Iran. State the assumptions in one line and continue.
+If the user says "you decide": use their brand color if any, otherwise the feel from the industry table; Persian + `--market iran` when the request is in Persian or mentions Iran — and say "Assuming the audience is inside Iran — tell me if not." State the assumptions in one line and continue. Token format: `--format` (default `tailwind4`; the stack's adapter in web-ui-playbook `references/stacks/` names the right one).
 
 ### 2. Generate — from the user's project folder
 ```bash

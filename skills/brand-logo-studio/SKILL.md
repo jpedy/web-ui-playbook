@@ -46,7 +46,7 @@ It writes ~32 files (list: references/brand-kit-spec.md §2) plus `kit-report.md
 3. Walk references/logo-review-checklist.md (automated part + by-eye part).
 
 ### 7. Integrate and report
-Paste `public/brand/head-snippet.blade.php` into the layout `<head>`; use `asset('brand/svg/logo-h-rtl.svg')` in the header with a fixed height (brand-kit-spec.md §3). Report with the template at the end of the checklist: direction, files, Persian name check result, colors and warnings, the legal note, and what you could not check. **Say that passing the checks does not prove the logo is good or original.**
+Follow the install line in `kit-report.md` — it comes from the project's stack (`.web-ui-playbook.json`, or `"stack"` in the brief). Laravel: copy the kit to `public/brand/`, paste `head-snippet.blade.php` into the layout `<head>` and use `asset('brand/svg/logo-h-rtl.svg')` in the header with a fixed height (brand-kit-spec.md §3). Report with the template at the end of the checklist: direction, files, Persian name check result, colors and warnings, the legal note, and what you could not check. **Say that passing the checks does not prove the logo is good or original.**
 
 ## Other tasks
 - Persian/Latin text to outlined SVG: `scripts/text-to-path.mjs --text "…" --font … --out file.svg` (fonts: `--list-fonts`).
@@ -58,7 +58,7 @@ Paste `public/brand/head-snippet.blade.php` into the layout `<head>`; use `asset
 2. **The name is the user's.** Copy it exactly; report every normalization (ي→ی, ك→ک, digits) and ZWNJ warning for confirmation.
 3. **Persian letter-spacing is always 0.** Tracking applies to Latin runs only.
 4. **Real cut-outs, not color, separate shapes** — the logo must survive one-color print, a stamp, a 16 px favicon.
-5. **Always deliver a Persian-only version** (`logo-fa-only.svg`) when the logo has Latin letters — registration in Iran may require a commercial card otherwise (references/legal-iran.md ⏱ — verify with an IP attorney; not legal advice).
+5. **Always deliver a Persian-only version** (`logo-fa-only.svg`) when the logo has Latin letters — for market Iran, registration may require a commercial card otherwise (references/legal-iran.md ⏱ — verify with an IP attorney; not legal advice). The brief's `market` (or the project profile's) decides which legal notes the kit report shows.
 6. **No clichés or forbidden content:** no flags, state emblems, Red Crescent, sacred words; no domes or Persepolis columns on unrelated businesses; R5/R8 only when the subject is related (logo-fundamentals.md §5).
 7. **Never copy** a known logo, its colors or composition; never use a stock/open-source icon as the logo.
 8. **Know the limits:** calligraphic logotypes (Nastaliq, Shekasteh), mascots and big rebrands need a human designer — say so and give the dated price ranges (legal-iran.md §5).

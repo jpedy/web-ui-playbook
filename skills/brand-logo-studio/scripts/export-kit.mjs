@@ -9,13 +9,14 @@
  * snippet, a brand sheet, a large proof sheet of the Persian wordmark, and kit-report.md.
  * Exit code 1 if any blocking validation finding remains. File list: references/brand-kit-spec.md.
  */
-import { loadBrief } from './lib/brief.mjs';
+import { loadBrief, preloadProfile } from './lib/brief.mjs';
 import { exportKit } from './lib/kit.mjs';
 import { outDir } from './lib/util.mjs';
 
 const args = process.argv.slice(2);
 const get = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
 if (!get('brief') || !get('direction')) { console.log('Usage: node export-kit.mjs --brief brief.json --direction A|B|C [--out public/brand]'); process.exit(2); }
+await preloadProfile(get('brief'));
 const brief = loadBrief(get('brief'));
 const out = outDir(get('out'));
 const res = await exportKit(brief, get('direction'), out);

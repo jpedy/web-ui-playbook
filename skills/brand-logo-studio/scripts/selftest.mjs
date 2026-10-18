@@ -24,8 +24,9 @@ import { decodePng, encodeIco, contrast, findChrome } from './lib/util.mjs';
 import { render } from './lib/vendor.mjs';
 import { validateSvg, inkRadius, oneColor } from './lib/validate.mjs';
 import { RECIPES, iconBody, svgDoc, lockup } from './lib/marks.mjs';
-import { loadBrief, logoColors } from './lib/brief.mjs';
-import { directions, exportKit } from './lib/kit.mjs';
+import { loadBrief, logoColors, preloadProfile } from './lib/brief.mjs';
+import { directions, exportKit, kitReport } from './lib/kit.mjs';
+import { integrationFor } from './lib/integrations.mjs';
 import { compareWithChrome } from './shaping-check.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -175,6 +176,36 @@ if (chrome) {
     check(r.analysis.edgeShare > 0.95 && r.analysis.largestInteriorBlob === 0, `«${t}»: the mismatch is edge anti-aliasing only (${(r.analysis.edgeShare * 100).toFixed(0)}% within 2 px of an edge)`);
   }
 } else console.log('(no Chrome/Edge found: browser comparison not run)');
+// 8. market and stack: brief → project profile (.web-ui-playbook.json) → defaults; legal notes follow the market
+{
+  const fxFile = path.join(DIR, 'fixtures', 'brief-zabansara.json');
+  const rawFx = JSON.parse(fs.readFileSync(fxFile, 'utf8'));
+  const dirC = { id: 'C', title: 'test' };
+  const rep = (b) => kitReport(b, dirC, ['favicon.svg'], [], [], null, [], integrationFor(b.stack));
+  const iranRep = rep(loadBrief(fxFile));
+  check(/Iranian trademark database/.test(iranRep) && /head-snippet\.blade\.php/.test(iranRep), 'market iran (brief): Iran legal notes and the Laravel integration');
+  const proj = fs.mkdtempSync(path.join(os.tmpdir(), 'bls-prof-'));
+  const { market, ...noMarket } = rawFx;
+  fs.writeFileSync(path.join(proj, 'brief.json'), JSON.stringify(noMarket));
+  if (fs.existsSync(path.join(DIR, '..', '..', 'web-ui-playbook', 'scripts', 'profile.mjs'))) {
+    fs.writeFileSync(path.join(proj, '.web-ui-playbook.json'), JSON.stringify({ version: 1, stack: 'laravel', languages: ['en'], dir: 'ltr', market: 'global' }));
+    await preloadProfile(path.join(proj, 'brief.json'));
+    const g = loadBrief(path.join(proj, 'brief.json'));
+    const gRep = rep(g);
+    check(g.market === 'global' && g.marketSource === 'profile' && g.stack === 'laravel', `no market in the brief → the project profile's market (${g.market}, from ${g.marketSource})`);
+    check(!/Iranian|legal-iran|کارت بازرگانی/.test(gRep) && /every country where/.test(gRep), 'market global: no Iran legal notes, a neutral trademark note instead');
+  }
+  const proj2 = fs.mkdtempSync(path.join(os.tmpdir(), 'bls-noprof-'));
+  fs.writeFileSync(path.join(proj2, 'package.json'), '{}'); // project root: the profile search stops here
+  fs.writeFileSync(path.join(proj2, 'brief.json'), JSON.stringify(noMarket));
+  const cwd0 = process.cwd(); process.chdir(proj2);
+  await preloadProfile(path.join(proj2, 'brief.json'));
+  const d = loadBrief(path.join(proj2, 'brief.json'));
+  process.chdir(cwd0);
+  check(d.market === 'iran' && d.marketSource === 'default' && /Market not set/.test(rep(d)), 'no market anywhere → the original default (iran), and the report says the market was not set');
+  fs.rmSync(proj, { recursive: true, force: true }); fs.rmSync(proj2, { recursive: true, force: true });
+}
+
 const saved = process.env.CHROME_PATH;
 process.env.CHROME_PATH = 'none';
 const sk = await compareWithChrome('زبان‌سرا', 'vazirmatn-black');

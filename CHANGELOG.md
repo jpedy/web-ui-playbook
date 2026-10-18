@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — branch v3-multistack (becomes 1.2.0)
+
+### Changed — deliberate behavior change
+- **`audit.mjs`: Iran rules now follow the market, not the language.** A Persian page audited without an Iran market gets `foreign-host` **warnings** (privacy/speed) instead of errors. Projects whose market is Iran — `"market": "iran"` in `.web-ui-playbook.json`, or `--iran` / `--market iran` — still get **errors**. Persian language rules (RTL, digits, ZWNJ, typography) are unchanged and still follow the text. Selftest: `selftest.mjs` §3c.
+
+### Added
+- **Project profile `.web-ui-playbook.json`** — three separate switches (stack · language/direction · market) read by `audit.mjs`, `generate-palette.mjs` and `export-kit.mjs`; command-line flags override it. `marketAssumed` records that Iran was assumed from a Persian request, and the audit report says so.
+- **`scripts/detect-stack.mjs`** — detects Laravel, Next.js (App/Pages Router), WordPress (block/classic/WooCommerce), static HTML, Nuxt/Vue, SvelteKit/Svelte, Astro, React SPA, Shopify and site builders; asks one question when a folder holds several projects; `--init` writes the profile and refuses to guess the market.
+- **`references/stacks/`** — adapter index (profile format, tiers, adapter template) and the Laravel adapter (Laravel 13, Livewire 4, Filament 5 — verified 2026-10-18: Laravel 13's self-hosted font helper, Livewire 4's `wire:model.live.blur`, Filament's remote default font).
+- `audit.mjs --market iran|global`, `--lang`, `--stack`, `--profile`; the JSON result reports the settings used.
+- `generate-palette.mjs --format` (token formats in `scripts/formats.mjs`; `tailwind4` = the previous output, byte-identical) and `--market global`; language and market default to the profile.
+- brand-logo-studio: per-stack integration files (`lib/integrations.mjs`; Laravel's `head-snippet.blade.php` unchanged); the kit report shows Iran legal notes only for market Iran, a neutral trademark note otherwise, and says when the market was not set.
+
+### Internal
+- Markup readers moved to `scripts/parsers/` unchanged (each audit rule exists once for every stack).
+- `performance-and-tech.md` is stack-neutral now; Laravel setup, Blade components, Livewire/Filament/Inertia notes moved to `references/stacks/laravel.md` (updated to current versions).
+- SKILL.md: step 0 "Profile", a visible "Assuming the audience is inside Iran — tell me if not." line, a shorter trigger-focused description (884 characters).
+- Regression proof: every v1.1.0 fixture, the v2 school page and the earlier test pages give identical audit JSON (except the change above); palettes and the logo kit are byte-identical.
+
 ## 1.1.0 — 2026-10-17
 
 ### New skills

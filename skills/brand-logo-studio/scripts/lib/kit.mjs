@@ -14,6 +14,7 @@ import { shapeText } from './shape.mjs';
 import { transformPath } from './path.mjs';
 import { hasLatin } from './bidi.mjs';
 import { proofSheet } from '../proof-sheet.mjs';
+import { integrationFor } from './integrations.mjs';
 
 const r2 = (n) => Math.round(n * 100) / 100;
 const vbOf = (svg) => svg.match(/viewBox="([^"]+)"/)[1].split(/\s+/).map(Number);
@@ -152,25 +153,22 @@ export async function exportKit(brief, dirId, out) {
   write(path.join(pngDir, 'avatar-640.png'), (await render(square(640, c.lightBg, icon, 0.6 * 640), { width: 640 })).png);
   write(path.join(pngDir, 'email-signature.png'), (await render(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80"><rect width="320" height="80" fill="#ffffff"/>${place(primary, 8, 12, 304, 56)}</svg>`, { width: 320 })).png);
 
-  // 4. web manifest + head snippet (Laravel: copy the kit to public/brand)
+  // 4. web manifest + the stack's integration files (integrations.mjs)
   write(path.join(out, 'site.webmanifest'), JSON.stringify({ name: brief.name.fa || brief.name.en, short_name: brief.name.fa || brief.name.en, icons: [
     { src: '/brand/png/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/brand/png/icon-512.png', sizes: '512x512', type: 'image/png' },
     { src: '/brand/png/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }], theme_color: c.primary, background_color: c.lightBg, display: 'standalone', dir: brief.name.fa ? 'rtl' : 'ltr', lang: brief.name.fa ? 'fa' : 'en' }, null, 2));
-  write(path.join(out, 'head-snippet.blade.php'), [
-    '{{-- Copy this kit to public/brand/ and paste inside <head> of your layout --}}',
-    `<link rel="icon" href="{{ asset('brand/favicon.ico') }}" sizes="32x32">`,
-    `<link rel="icon" href="{{ asset('brand/favicon.svg') }}" type="image/svg+xml">`,
-    `<link rel="apple-touch-icon" href="{{ asset('brand/png/apple-touch-icon.png') }}">`,
-    `<link rel="manifest" href="{{ asset('brand/site.webmanifest') }}">`,
-    `<meta name="theme-color" content="${c.primary}">`,
-    `<meta property="og:image" content="{{ asset('brand/png/og-image.png') }}">`, ''].join('\n'));
+  const integ = integrationFor(brief.stack);
+  for (const [name, text] of integ.files({ c, brief })) {
+    fs.mkdirSync(path.dirname(path.join(out, name)), { recursive: true });
+    write(path.join(out, name), text);
+  }
 
   // 5. proof sheet (by eye) and brand sheet
   let proof = null;
   if (brief.name.fa) { proof = await proofSheet(brief.name.fa, brief.fonts.fa, path.join(proofDir, 'proof-wordmark.png')); files.push('proof/proof-wordmark.png'); }
   await brandSheet(brief, path.join(out, 'brand-sheet.png'), { primary, reversed, icon });
   files.push('brand-sheet.png');
-  const report = kitReport(brief, dir, [...files, 'kit-report.md'], findings, [...warnings], proof, decisions);
+  const report = kitReport(brief, dir, [...files, 'kit-report.md'], findings, [...warnings], proof, decisions, integ);
   write(path.join(out, 'kit-report.md'), report);
   return { files, findings, warnings: [...warnings], proof, dir, decisions };
 }
@@ -227,8 +225,9 @@ function group(findings) {
   return [...m.values()];
 }
 
-function kitReport(brief, dir, files, findings, warnings, proof, decisions = []) {
+export function kitReport(brief, dir, files, findings, warnings, proof, decisions = [], integ = integrationFor(brief.stack)) {
   const c = brief.colors;
+  const iran = brief.market === 'iran';
   const latin = hasLatin(`${brief.name.fa || ''} ${brief.name.en || ''}`);
   const blocking = findings.filter((f) => f.level === 'FAIL');
   return `# Brand kit — ${brief.name.fa || ''} ${brief.name.en || ''}
@@ -238,7 +237,7 @@ Generated ${new Date().toISOString().slice(0, 10)} by brand-logo-studio · direc
 ## Check these by eye before using the logo
 - Open \`proof/proof-wordmark.png\`: every letter, dot and join of «${brief.name.fa || '—'}» must be right${proof ? ` (browser comparison: ${proof.chrome.status}${proof.chrome.score ? `, ${(proof.chrome.score * 100).toFixed(1)}% ink overlap` : ''})` : ''}.
 - Open \`brand-sheet.png\`: the icon must still read at 16 px; the reversed logo must be clear on dark.
-- Automated checks: ${blocking.length ? `${blocking.length} blocking problem(s), listed under Validation` : 'no blocking problems'}. **Passing them does not prove the logo is good, original or free to register.** Search for similar marks before using it (references/legal-iran.md).
+- Automated checks: ${blocking.length ? `${blocking.length} blocking problem(s), listed under Validation` : 'no blocking problems'}. **Passing them does not prove the logo is good, original or free to register.** Search for similar marks before using it${iran ? ' (references/legal-iran.md)' : ' in the trademark register of every country where you trade'}.
 
 ${decisions.length ? `## Decisions made automatically
 ${decisions.map((d) => `- ${d}`).join('\n')}
@@ -246,7 +245,7 @@ ${decisions.map((d) => `- ${d}`).join('\n')}
 ` : ''}## Files
 ${files.map((f) => `- \`${f}\``).join('\n')}
 
-Copy the folder to \`public/brand/\` in your Laravel project and paste \`head-snippet.blade.php\` into the \`<head>\` of your layout.
+${integ.install}
 
 ## Colors
 | Role | Hex | On white | On dark (${c.darkBg}) |
@@ -262,7 +261,8 @@ ${findings.length ? group(findings).map(([f, list]) => `- ${f.level} · ${f.id}:
 ${warnings.length ? '\n' + warnings.map((w) => `- note: ${w}`).join('\n') : ''}
 
 ## Legal notes ⏱ (as of 2026-10-16 — not legal advice)
-${latin ? '- The logo contains Latin letters. According to the research this skill is based on (1404–1405 / 2025–2026), registering a mark with Latin letters in Iran requires a commercial card (کارت بازرگانی). `svg/logo-fa-only.svg` is the Persian-only version for a domestic filing. **Verify with an IP attorney** before filing — this rule was not independently confirmed.' : '- The logo is Persian-only.'}
-- Search the Iranian trademark database and the official gazette before use (steps in references/legal-iran.md); verify with an IP attorney before relying on the result.
+${iran ? `${brief.marketSource === 'default' ? '- Market not set in the brief or `.web-ui-playbook.json` — the Iran notes below are shown by default; set `"market": "global"` if the brand is not for Iran.\n' : ''}${latin ?'- The logo contains Latin letters. According to the research this skill is based on (1404–1405 / 2025–2026), registering a mark with Latin letters in Iran requires a commercial card (کارت بازرگانی). `svg/logo-fa-only.svg` is the Persian-only version for a domestic filing. **Verify with an IP attorney** before filing — this rule was not independently confirmed.' : '- The logo is Persian-only.'}
+- Search the Iranian trademark database and the official gazette before use (steps in references/legal-iran.md); verify with an IP attorney before relying on the result.` : `- Search the trademark register of every country where the brand will trade (for example WIPO's Global Brand Database) before use, and verify with an IP attorney before relying on the result.
+- Copyright and trademark rules differ by country; nothing in this kit is legal advice.`}
 `;
 }

@@ -32,7 +32,7 @@
    Laravel/Vite: uncomment these two imports after
    `npm i @fontsource-variable/inter @fontsource-variable/vazirmatn`.
    Standalone Tailwind CLI: copy the woff2 files into /fonts and use
-   @font-face instead (see references/performance-and-tech.md §9). */
+   @font-face instead (see references/performance-and-tech.md §5). */
 /* @import "@fontsource-variable/inter"; */
 /* @import "@fontsource-variable/vazirmatn"; */
 

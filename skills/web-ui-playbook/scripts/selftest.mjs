@@ -74,6 +74,77 @@ for (const k of Object.keys(expRel)) check(rc[k] === expRel[k] && (rel.findings 
 for (const k of new Set([...Object.keys(expNorm), ...Object.keys(nc)])) check((nc[k] || 0) === (expNorm[k] || 0) && (nor.findings || []).filter((f) => f.rule === k).every((f) => f.sev === 'warn'), `normal mode: ${k} ${expNorm[k] || 0} warnings (got ${nc[k] || 0})`);
 check(rel.status === 1 && !(rel.findings || []).some((f) => /۰۹۱۲ ۱۲۳ ۴۵۶۷/.test(f.msg)), '--release exits 1; the input placeholder hint «۰۹۱۲ ۱۲۳ ۴۵۶۷» is allowed');
 
+// 3c. three switches: market (Iran rules), language (Persian rules), stack — profile file + flags
+const sevs = (res, rule) => (res.findings || []).filter((f) => f.rule === rule).map((f) => f.sev);
+const badFa = path.join(FX, 'bad-fa.html');
+const noMarket = audit([badFa]), withIran = audit([badFa, '--iran']), mGlobal = audit([badFa, '--market', 'global']);
+check(sevs(noMarket, 'foreign-host').length === 3 && sevs(noMarket, 'foreign-host').every((s) => s === 'warn'), 'deliberate change (v1.2.0): a Persian page without an Iran market gets foreign-host WARNINGS, not errors');
+check(sevs(withIran, 'foreign-host').length === 3 && sevs(withIran, 'foreign-host').every((s) => s === 'error'), '--iran: foreign hosts are errors');
+check(sevs(mGlobal, 'foreign-host').every((s) => s === 'warn') && (mGlobal.findings || []).some((f) => f.rule === 'zwnj'), '--market global: still Persian rules for Persian text (language), no Iran errors (market)');
+const projDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wup-profile-'));
+fs.copyFileSync(badFa, path.join(projDir, 'index.html'));
+fs.writeFileSync(path.join(projDir, '.web-ui-playbook.json'), JSON.stringify({ version: 1, stack: 'static', languages: ['fa'], dir: 'rtl', market: 'iran', marketAssumed: true }));
+const viaProfile = (() => { const r = spawnSync(process.execPath, [AUDIT, 'index.html', '--json'], { encoding: 'utf8', cwd: projDir }); return JSON.parse(r.stdout); })();
+check(sevs(viaProfile, 'foreign-host').every((s) => s === 'error') && sevs(viaProfile, 'foreign-host').length === 3, 'profile market "iran" (from .web-ui-playbook.json) → foreign hosts are errors, no flag needed');
+check(viaProfile.settings?.market === 'iran' && viaProfile.settings?.marketAssumed === true && viaProfile.settings?.stack === 'static', 'profile: market, "assumed" marker and stack are reported in the result');
+const flagWins = (() => { const r = spawnSync(process.execPath, [AUDIT, 'index.html', '--market', 'global', '--json'], { encoding: 'utf8', cwd: projDir }); return JSON.parse(r.stdout); })();
+check(sevs(flagWins, 'foreign-host').every((s) => s === 'warn') && flagWins.settings?.marketSource === '--market flag', 'a command-line flag overrides the profile');
+const txt = spawnSync(process.execPath, [AUDIT, 'index.html'], { encoding: 'utf8', cwd: projDir }).stdout;
+check(/ASSUMED/.test(txt), 'text report says visibly that the Iran market was assumed');
+fs.rmSync(projDir, { recursive: true, force: true });
+const en = audit([path.join(FX, 'en-global.html'), '--market', 'global']);
+const FA_RULES = /^(arabic-|zwnj|fa-|html-dir|physical-direction|physical-css|space-x|row-reverse)/;
+check(!(en.findings || []).some((f) => FA_RULES.test(f.rule)) && !(en.findings || []).some((f) => f.sev === 'error' && /foreign|external/.test(f.rule)), `English LTR page, market global: no Persian or Iran rule fires (got: ${[...new Set((en.findings || []).map((f) => f.rule))].join(', ')})`);
+check(sevs(en, 'foreign-host').length === 1 && sevs(en, 'foreign-host')[0] === 'warn', 'English page: the Google Fonts link is still reported, as a privacy/speed warning');
+// stack detection
+const { detectStack } = await import('./detect-stack.mjs');
+const mk = (files) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'wup-stack-')); for (const [f, c] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(d, f)), { recursive: true }); fs.writeFileSync(path.join(d, f), c); } return d; };
+const pkg = (deps) => JSON.stringify({ dependencies: deps });
+const STACK_CASES = [
+  ['laravel', 'livewire', { 'composer.json': JSON.stringify({ require: { 'laravel/framework': '^12.0', 'livewire/livewire': '^3.0' } }), 'artisan': '', 'resources/views/welcome.blade.php': '<h1>hi</h1>' }],
+  ['next', 'shadcn', { 'package.json': pkg({ next: '16.4.2', react: '19.3.1' }), 'app/page.tsx': 'export default function P(){return <h1>Hi</h1>}', 'components.json': '{}' }],
+  ['next-pages', null, { 'package.json': pkg({ next: '16.4.2' }), 'pages/index.tsx': '' }],
+  ['wordpress', 'block', { 'style.css': '/*\nTheme Name: Test\n*/', 'theme.json': '{"version":3}', 'templates/index.html': '<!-- wp:paragraph -->' }],
+  ['wordpress', 'classic+woocommerce', { 'style.css': '/* Theme Name: Old */', 'functions.php': "<?php add_theme_support( 'woocommerce' );", 'index.php': '' }],
+  ['static', null, { 'index.html': '<!doctype html><html lang="en"><h1>Hi</h1></html>' }],
+  ['nuxt', null, { 'package.json': pkg({ nuxt: '4.6.2' }) }],
+  ['sveltekit', null, { 'package.json': pkg({ '@sveltejs/kit': '3.1.0', svelte: '5' }) }],
+  ['astro', null, { 'package.json': pkg({ astro: '7.4.0' }) }],
+  ['react-spa', null, { 'package.json': JSON.stringify({ dependencies: { react: '19' }, devDependencies: { vite: '7' } }) }],
+  ['shopify', null, { 'layout/theme.liquid': '{{ content_for_layout }}' }],
+  ['builder', 'webflow', { 'index.html': '<html data-wf-site="123"><meta name="generator" content="Webflow"></html>' }],
+];
+for (const [stack, subtype, files] of STACK_CASES) {
+  const d = mk(files); const r = detectStack(d);
+  check(r.primary?.stack === stack && (r.primary?.subtype || null) === subtype, `detect-stack: ${stack}${subtype ? ` (${subtype})` : ''} (got ${r.primary?.stack || 'none'}${r.primary?.subtype ? ` (${r.primary.subtype})` : ''})`);
+  fs.rmSync(d, { recursive: true, force: true });
+}
+const mono = mk({ 'package.json': JSON.stringify({ private: true, workspaces: ['web', 'api'] }), 'web/package.json': pkg({ next: '16.4.2' }), 'web/app/page.tsx': '', 'api/composer.json': JSON.stringify({ require: { 'laravel/framework': '^12' } }), 'api/artisan': '' });
+const mr = detectStack(mono);
+check(mr.ambiguous && mr.candidates.length === 2 && !mr.primary, 'detect-stack: Next.js + Laravel in one folder → ambiguous, ask one question');
+const DS = path.join(DIR, 'detect-stack.mjs');
+const noMk = spawnSync(process.execPath, [DS, mono, '--init', '--stack', 'next'], { encoding: 'utf8' });
+check(noMk.status === 2 && /--market iran\|global/.test(noMk.stderr), '--init refuses without --market (the market is never guessed from code)');
+const ok = spawnSync(process.execPath, [DS, mono, '--init', '--stack', 'next', '--market', 'iran', '--assumed', '--lang', 'fa'], { encoding: 'utf8' });
+const written = JSON.parse(fs.readFileSync(path.join(mono, 'web', '.web-ui-playbook.json'), 'utf8'));
+check(ok.status === 0 && written.stack === 'next' && written.market === 'iran' && written.marketAssumed === true && written.dir === 'rtl' && /Assuming the audience is inside Iran/.test(ok.stdout), '--init writes the profile into the chosen app folder, records "assumed" and prints the sentence to tell the user');
+const again = spawnSync(process.execPath, [DS, mono, '--init', '--stack', 'next', '--market', 'global'], { encoding: 'utf8' });
+check(again.status === 2 && /already exists/.test(again.stderr), '--init never overwrites an existing profile without --force');
+fs.rmSync(mono, { recursive: true, force: true });
+
+// 3d. progressive disclosure: SKILL.md stays short; every stack adapter has the template's headings
+const skill = fs.readFileSync(path.join(DIR, '..', 'SKILL.md'), 'utf8');
+const desc = (skill.match(/^description: (.*)$/m) || [])[1] || '';
+check(skill.split('\n').length <= 150 && desc.length > 0 && desc.length <= 1024, `SKILL.md ≤ 150 lines (${skill.split('\n').length}) and description ≤ 1024 characters (${desc.length})`);
+const STACKS = path.join(DIR, '..', 'references', 'stacks');
+const HEADINGS = ['Verified on', 'Project structure', 'Where tokens live', 'Components and templates', 'RTL and i18n', 'Fonts (self-hosted)', 'Icons and favicons', 'Images', 'Forms', 'Motion baseline', 'Accessibility specifics', 'Build and test', 'Audit and render recipe', 'Known pitfalls'];
+for (const f of fs.readdirSync(STACKS).filter((n) => n.endsWith('.md') && !['README.md', 'tier2-frameworks.md', 'builders.md'].includes(n))) {
+  const t = fs.readFileSync(path.join(STACKS, f), 'utf8');
+  const missing = HEADINGS.filter((h) => !t.includes(`## ${h}`));
+  check(!missing.length && /## Verified on\n[^\n]*⏱[^\n]*20\d\d-\d\d-\d\d/.test(t), `adapter ${f}: all template headings and a dated "Verified on" line${missing.length ? ` (missing: ${missing.join(', ')})` : ''}`);
+  check(t.split('\n').length <= 160, `adapter ${f}: ≤ 160 lines (${t.split('\n').length})`);
+}
+
 // 4. render
 const chrome = findChrome();
 const rfile = path.join(FX, 'render-fa.html');

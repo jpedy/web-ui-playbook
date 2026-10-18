@@ -29,6 +29,21 @@ export const DECISION = {
 
 const req = (cond, msg) => { if (!cond) throw new Error(`brief: ${msg}`); };
 
+/** The project's .web-ui-playbook.json (web-ui-playbook profile), searched from the brief's folder, then the working folder. */
+async function projectProfile(dir) {
+  try {
+    const { loadProfile } = await import('../../../web-ui-playbook/scripts/profile.mjs');
+    return loadProfile({ start: dir }) || loadProfile({ start: process.cwd() });
+  } catch { return null; } // web-ui-playbook not installed next to this skill
+}
+const PROFILE_CACHE = new Map();
+/** Call (await) before loadBrief so the brief can fall back to the project's market and stack. */
+export async function preloadProfile(file) {
+  const dir = path.dirname(path.resolve(file));
+  if (!PROFILE_CACHE.has(dir)) PROFILE_CACHE.set(dir, await projectProfile(dir));
+  return PROFILE_CACHE.get(dir);
+}
+
 /** Load and normalize a brief JSON file. Paths inside the brief resolve relative to the brief. */
 export function loadBrief(file) {
   const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -44,9 +59,13 @@ export function loadBrief(file) {
     monogram: raw.monogram || (fa ? [...fa.text][0] : raw.name.en[0]),
     fonts: { fa: raw.fonts?.fa || d.fa, en: raw.fonts?.en || d.en, letter: raw.fonts?.letter || 'vazirmatn-black' },
     tracking: raw.tracking ?? 0,
-    market: raw.market || 'iran',
     notes: fa?.changes || [],
   };
+  // market and stack: the brief, else the project profile (preloadProfile), else the original defaults (iran, laravel)
+  const prof = PROFILE_CACHE.get(dir)?.data || {};
+  brief.market = raw.market || prof.market || 'iran';
+  brief.marketSource = raw.market ? 'brief' : prof.market ? 'profile' : 'default';
+  brief.stack = raw.stack || prof.stack || 'laravel';
   brief.colors = logoColors(raw, dir);
   return brief;
 }

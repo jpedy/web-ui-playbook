@@ -3,14 +3,18 @@
  * web-ui-playbook audit — zero-dependency checker for HTML / Blade / JSX / TSX / Vue / CSS.
  *
  * Usage:
- *   node audit.mjs <file-or-dir> [more...] [--iran] [--rtl] [--json] [--contrast [--css <file-or-dir>]]
+ *   node audit.mjs <file-or-dir> [more...] [--market iran|global] [--rtl] [--json] [--contrast [--css <file-or-dir>]]
  *                  [--slop] [--render <built-page.html> [--render-root <public-dir>]] [--release]
  *
- *   --iran       users are inside Iran: foreign runtime hosts become errors everywhere
+ *   Settings come from the project's .web-ui-playbook.json (stack · language · market; see profile.mjs); flags override:
+ *   --market iran|global   Iran rules follow the market only: with iran, foreign runtime hosts are errors; otherwise
+ *                warnings (privacy/speed). A Persian page alone never switches Iran rules on.
+ *   --iran       same as --market iran
+ *   --lang fa|en|both, --stack <name>, --profile <file>
  *   --rtl        force Persian/RTL checks (auto-detected from lang="fa", dir="rtl" or Persian text)
  *   --json       machine-readable output
  *   --contrast   check every text element's color against its background (light + dark), using the
- *                project's tokens (CSS files among the targets, --css, or ./resources/css and ./src)
+ *                project's tokens (CSS files among the targets, --css, the profile's css folders, or ./resources/css and ./src)
  *                and Tailwind's default palette. Pairs it cannot determine (dynamic classes, Blade/JSX
  *                components, background images, unknown colors) are listed as "could not resolve" —
  *                never counted as passed. Small Persian text (< 14px) below 5.5:1 is a house-rule warning.
@@ -33,20 +37,27 @@ import { fileURLToPath } from 'node:url';
 import { slopAudit, loadAllow } from './slop.mjs';
 import { renderAudit } from './render.mjs';
 import { releaseChecks } from './release.mjs';
+import { EXT, parserFor } from './parsers/index.mjs';
+import { blank } from './parsers/markup.mjs';
+import { loadProfile, resolveSettings, describeSettings } from './profile.mjs';
 
 const isMain = !!process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 const args = isMain ? process.argv.slice(2) : [];
 const flags = new Set(args.filter((a) => a.startsWith('--')));
-const VALUE_FLAGS = ['--css', '--render', '--render-root'];
+const VALUE_FLAGS = ['--css', '--render', '--render-root', '--market', '--lang', '--stack', '--profile'];
 const valuesOf = (f) => args.flatMap((a, i) => (args[i - 1] === f ? [a] : []));
 const cssArgs = valuesOf('--css');
 const targets = args.filter((a, i) => !a.startsWith('--') && !VALUE_FLAGS.includes(args[i - 1]));
 if (isMain && !targets.length) {
-  console.log('Usage: node audit.mjs <file-or-dir> [...] [--iran] [--rtl] [--json] [--contrast [--css <file-or-dir>]] [--slop] [--render <page.html> [--render-root <dir>]] [--release]');
+  console.log('Usage: node audit.mjs <file-or-dir> [...] [--market iran|global | --iran] [--lang fa|en|both] [--stack <s>] [--profile <file>] [--rtl] [--json] [--contrast [--css <file-or-dir>]] [--slop] [--render <page.html> [--render-root <dir>]] [--release]');
   process.exit(2);
 }
+// the three switches (stack · language · market): profile file near the project, flags win
+const profileArg = valuesOf('--profile')[0];
+const PROFILE = isMain ? (loadProfile({ file: profileArg, start: process.cwd() }) || (!profileArg && targets[0] && fs.existsSync(targets[0]) ? loadProfile({ start: targets[0] }) : null)) : null;
+const S = isMain ? resolveSettings(args, { profile: PROFILE }) : { market: null, forceRtl: false, cssDirs: null, problems: [] };
+const IRAN = S.market === 'iran';
 
-const EXT = /\.(html?|blade\.php|jsx|tsx|vue|css)$/i;
 const SKIP_DIR = /^(node_modules|vendor|\.git|dist|build|storage|bootstrap|\.next|\.nuxt|coverage)$/;
 
 function walk(p, out = []) {
@@ -61,7 +72,6 @@ function walk(p, out = []) {
 }
 
 // ---------- helpers ----------
-const blank = (s) => s.replace(/[^\n]/g, ' ');
 const PERSIAN = /[؀-ۿ]/;
 const PERSIAN_LETTERS_G = /[ء-يپچژکگی]/g;
 
@@ -73,25 +83,6 @@ function lineIndex(text) {
     while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (starts[mid] <= idx) lo = mid; else hi = mid - 1; }
     return lo + 1;
   };
-}
-
-/** Remove comments (keeping line structure). */
-function stripComments(src, isCss) {
-  let s = src.replace(/<!--[\s\S]*?-->/g, blank).replace(/\{\{--[\s\S]*?--\}\}/g, blank);
-  s = s.replace(/\/\*[\s\S]*?\*\//g, blank);
-  if (!isCss) s = s.replace(/(^|[^:"'`])\/\/[^\n]*/g, (m, p1) => p1 + blank(m.slice(p1.length)));
-  return s;
-}
-
-/** Visible text only: drop script/style, Blade/PHP expressions, then tags. */
-function visibleText(s) {
-  return s
-    .replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, blank)
-    .replace(/@php[\s\S]*?@endphp/g, blank)
-    .replace(/<\?php[\s\S]*?\?>/g, blank)
-    .replace(/\{\{[\s\S]*?\}\}|\{!![\s\S]*?!!\}/g, blank)
-    .replace(/<code\b[\s\S]*?<\/code>|<pre\b[\s\S]*?<\/pre>/gi, blank)
-    .replace(/<[^>]*>/g, blank);
 }
 
 const FOREIGN_HOSTS = [
@@ -115,13 +106,13 @@ const PHYSICAL = [
 const CLAIMS = [];
 function auditFile(file) {
   const raw = fs.readFileSync(file, 'utf8');
-  const isCss = /\.css$/i.test(file);
-  const isPage = /\.(html?|blade\.php)$/i.test(file);
+  const P = parserFor(file);
+  const isCss = P.isCss;
   const findings = [];
   const rawLines = raw.split('\n');
   const ignored = new Set();
   rawLines.forEach((l, i) => { if (l.includes('audit-ignore')) { ignored.add(i + 1); ignored.add(i + 2); } });
-  const src = stripComments(raw, isCss);
+  const src = P.stripComments(raw, isCss);
   const lineOf = lineIndex(src);
   const add = (sev, rule, idx, msg) => {
     const line = typeof idx === 'number' ? lineOf(idx) : 0;
@@ -130,17 +121,16 @@ function auditFile(file) {
   };
 
   const persianCount = (src.match(PERSIAN_LETTERS_G) || []).length;
-  const rtl = flags.has('--rtl') || /\bdir\s*=\s*["']rtl["']/.test(src) || /\blang\s*=\s*["']fa/.test(src)
+  const rtl = S.forceRtl || /\bdir\s*=\s*["']rtl["']/.test(src) || /\blang\s*=\s*["']fa/.test(src)
     || /:lang\(fa\)|Vazirmatn/.test(src) || persianCount > 20;
-  const iran = flags.has('--iran');
 
-  // 1. Foreign runtime hosts
+  // 1. Foreign runtime hosts — errors only for the Iran market (they fail or crawl there); elsewhere a privacy/speed warning
   for (const host of FOREIGN_HOSTS) {
     const re = new RegExp(host.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&'), 'g');
     let m;
     while ((m = re.exec(src))) {
-      add(iran || rtl ? 'error' : 'warn', 'foreign-host', m.index,
-        `Runtime request to ${host} — self-host/bundle it or use a domestic alternative (iran-network-resilience.md).`);
+      if (IRAN) add('error', 'foreign-host', m.index, `Runtime request to ${host} — self-host/bundle it or use a domestic alternative (iran-network-resilience.md).`);
+      else add('warn', 'foreign-host', m.index, `Runtime request to ${host} — self-host or bundle it (privacy, speed, no outage when that host is slow or blocked).`);
     }
   }
 
@@ -151,9 +141,8 @@ function auditFile(file) {
     add('error', 'arabic-letters', m.index, `Arabic "${m[0]}" — use Persian ی / ک.`);
 
   // 3. Class attributes
-  const classRe = /(?:\bclass|\bclassName|:class|x-bind:class)\s*=\s*(?:"([^"]*)"|'([^']*)'|\{`([^`]*)`\})|->class\(\s*'([^']*)'|\$base\s*=\s*'([^']*)'/g;
-  for (const m of src.matchAll(classRe)) {
-    const list = m[1] ?? m[2] ?? m[3] ?? m[4] ?? m[5] ?? '';
+  for (const m of P.classLists(src)) {
+    const list = m.list;
     const tokens = list.split(/\s+/).filter(Boolean);
     const tagStart = src.lastIndexOf('<', m.index);
     const tagEnd = src.indexOf('>', m.index);
@@ -258,17 +247,17 @@ function auditFile(file) {
 
   // 6. Generic-page tells + claims for the owner to confirm (--slop)
   if (flags.has('--slop') && !isCss) {
-    const r = slopAudit({ file, raw, src, vis: visibleText(src), lineOf, ignored, allow: loadAllow(path.dirname(file)) });
+    const r = slopAudit({ file, raw, src, vis: P.visibleText(src), lineOf, ignored, allow: loadAllow(path.dirname(file)) });
     findings.push(...r.findings);
     CLAIMS.push(...r.claims);
   }
 
   // 7. Release gate: placeholders, fake sample data, example phone numbers (errors with --release)
-  if (!isCss) findings.push(...releaseChecks({ file, raw, src, vis: visibleText(src), lineOf, ignored, release: flags.has('--release') }));
+  if (!isCss) findings.push(...releaseChecks({ file, raw, src, vis: P.visibleText(src), lineOf, ignored, release: flags.has('--release') }));
 
   // 8. Persian text hygiene (visible text only)
   if (rtl && !isCss) {
-    const vis = visibleText(src);
+    const vis = P.visibleText(src);
     for (const m of vis.matchAll(/(^|[\s«(])(ن?می) (?=[؀-ۿ])/g))
       add('warn', 'zwnj', m.index + m[1].length, `"${m[2]} " + verb — use ZWNJ: ${m[2]}‌… (نیم‌فاصله).`);
     for (const m of vis.matchAll(/[؀-ۿ] (ها|های|هایی|تر|ترین)(?=[\s.،؛:!؟»)]|$)/g))
@@ -495,21 +484,6 @@ function styleOf(el, mode, R) {
   return out;
 }
 
-const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr', '!doctype']);
-const TAG_RE = /<(\/?)([A-Za-z!][\w:.-]*)((?:"[^"]*"|'[^']*'|\{\{[\s\S]*?\}\}|\{[^{}]*\}|[^'"{}>])*)>/g;
-function parseEl(tag, attrs, line) {
-  const cls = attrs.match(/(?:^|\s)class(?:Name)?\s*=\s*(?:"([^"]*)"|'([^']*)'|\{\s*["'`]([^"'`]*)["'`]\s*\})/);
-  const classText = cls ? cls[1] ?? cls[2] ?? cls[3] : '';
-  const dynamic = /(?:^|\s)(?::class|x-bind:class|v-bind:class|:style|x-bind:style|v-bind:style)\s*=|@class\s*\(|@style\s*\(|className\s*=\s*\{(?!\s*["'`][^"'`]*["'`]\s*\})/.test(attrs)
-    || /\{\{|\{!!|<\?|@(if|isset|unless|class)|\$\{/.test(classText);
-  const st = attrs.match(/(?:^|\s)style\s*=\s*"([^"]*)"/);
-  return {
-    tag: tag.toLowerCase(), line, dynamic, style: st ? st[1] : null,
-    component: /^(x-|livewire:)|^[A-Z]|[:.]/.test(tag) || tag.includes('-'),
-    classes: classText.split(/\s+/).filter(Boolean),
-  };
-}
-
 /** Walk up from the text's element to find its text color and background. */
 function evalText(stack, mode, R, page) {
   let fg = null, fgFrom = null, bg = null, bgFrom = null, size = null, weight = null, opacity = 1;
@@ -555,12 +529,13 @@ function contrastFile(file, R, layoutBody) {
   const raw = fs.readFileSync(file, 'utf8');
   const ignored = new Set();
   raw.split('\n').forEach((l, i) => { if (l.includes('audit-ignore')) { ignored.add(i + 1); ignored.add(i + 2); } });
-  const src = stripComments(raw, false).replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, blank).replace(/@php[\s\S]*?@endphp/g, blank).replace(/<\?php[\s\S]*?\?>/g, blank);
+  const P = parserFor(file);
+  const src = P.stripComments(raw, false).replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, blank).replace(/@php[\s\S]*?@endphp/g, blank).replace(/<\?php[\s\S]*?\?>/g, blank);
   const lineOf = lineIndex(src);
   const usesDark = /(^|[\s"'`])dark:(text|bg)-/.test(src);
   const modes = R.hasDark || usesDark ? ['light', 'dark'] : ['light'];
   const body = (src.match(/<body\b[^>]*>/i) || [])[0];
-  const bodyEl = body ? parseEl('body', body.slice(5, -1), 0) : layoutBody;
+  const bodyEl = body ? P.parseEl('body', body.slice(5, -1), 0) : layoutBody;
   const page = {};
   for (const mode of modes) {
     const st = bodyEl && !bodyEl.dynamic ? styleOf(bodyEl, mode, R) : {};
@@ -594,7 +569,7 @@ function contrastFile(file, R, layoutBody) {
       else if (persian && r.px < 14 && r.ratio < 5.5) findings.push({ file, line, sev: 'warn', rule: 'fa-contrast', msg: `[${mode}] small Persian text "${snippet}" ${pair} = ${shown}:1 — house rule: ≥ 5.5:1 under 14px (WCAG passes).` });
     }
   };
-  for (const m of src.matchAll(TAG_RE)) {
+  for (const m of src.matchAll(P.TAG_RE)) {
     onText(src.slice(last, m.index), last);
     last = m.index + m[0].length;
     const tag = m[2], lower = tag.toLowerCase();
@@ -608,8 +583,8 @@ function contrastFile(file, R, layoutBody) {
     }
     const selfClose = /\/\s*$/.test(m[3]);
     if (lower === 'svg') { if (!selfClose) svgDepth++; continue; }
-    if (svgDepth || VOID.has(lower) || selfClose) continue;
-    stack.push(parseEl(tag, m[3], lineOf(m.index)));
+    if (svgDepth || P.VOID.has(lower) || selfClose) continue;
+    stack.push(P.parseEl(tag, m[3], lineOf(m.index)));
   }
   onText(src.slice(last), last);
   return { findings, checked, unresolved };
@@ -617,7 +592,7 @@ function contrastFile(file, R, layoutBody) {
 
 function runContrast(files) {
   let cssFiles = [...files.filter((f) => /\.css$/i.test(f)), ...cssArgs.flatMap((p) => (fs.existsSync(p) ? walk(p).filter((f) => /\.css$/i.test(f)) : []))];
-  if (!cssFiles.length) for (const d of ['resources/css', 'src']) if (fs.existsSync(d)) cssFiles.push(...walk(d).filter((f) => /\.css$/i.test(f)));
+  if (!cssFiles.length) for (const d of S.cssDirs || ['resources/css', 'src']) if (fs.existsSync(d)) cssFiles.push(...walk(d).filter((f) => /\.css$/i.test(f)));
   cssFiles = cssInImportOrder(cssFiles);
   const R = loadTheme(cssFiles);
   cssFiles = cssFiles.map((f) => path.relative(process.cwd(), f) || f);
@@ -625,7 +600,7 @@ function runContrast(files) {
   let layoutBody = null;
   for (const f of pages) {
     const b = fs.readFileSync(f, 'utf8').match(/<body\b[^>]*>/i);
-    if (b && /class\s*=/.test(b[0])) { layoutBody = parseEl('body', b[0].slice(5, -1), 0); break; }
+    if (b && /class\s*=/.test(b[0])) { layoutBody = parserFor(f).parseEl('body', b[0].slice(5, -1), 0); break; }
   }
   const out = { cssFiles, findings: [], checked: 0, unresolved: [] };
   for (const f of pages) { const r = contrastFile(f, R, layoutBody); out.findings.push(...r.findings); out.checked += r.checked; out.unresolved.push(...r.unresolved); }
@@ -676,7 +651,7 @@ for (const page of valuesOf('--render')) {
     for (const h of run.headlines) if (h.tag === 'h1' && h.lines > (run.width < 768 ? 3 : 2)) once({ file: page, line: 0, sev: 'warn', rule: 'render-headline', msg: `${tag} <h1> "${h.text}" wraps to ${h.lines} lines — keep it to ${run.width < 768 ? 3 : 2} (shorten it, not the font).` });
     for (const t of run.texts) if (!t.why && t.fa && t.px < 13) once({ file: page, line: 0, sev: 'warn', rule: 'render-small-fa', msg: `Persian text "${t.text}" renders at ${t.px}px — house rule ≥ 13px.` });
     if (!run.bodyFontLoaded && !/^(serif|sans-serif|system-ui|monospace|ui-sans-serif|ui-serif|-apple-system)$/i.test(run.bodyFont)) once({ file: page, line: 0, sev: 'warn', rule: 'render-font', msg: `body font "${run.bodyFont}" did not load (fonts loaded: ${run.fonts.join(', ') || 'none'}) — check the @font-face URLs.` });
-    if (run.external.length) once({ file: page, line: 0, sev: flags.has('--iran') ? 'error' : 'warn', rule: 'render-external', msg: `the page tried to load from other hosts (blocked during the test): ${[...new Set(run.external)].join(', ')}.` });
+    if (run.external.length) once({ file: page, line: 0, sev: IRAN ? 'error' : 'warn', rule: 'render-external', msg: `the page tried to load from other hosts (blocked during the test): ${[...new Set(run.external)].join(', ')}.` });
   }
   // no-JS view (JavaScript off; no measurement shims): content that disappears or stays empty without JS
   if (r.nojs) {
@@ -699,8 +674,11 @@ const errors = all.filter((f) => f.sev === 'error').length;
 const warns = all.length - errors;
 
 if (flags.has('--json')) {
-  console.log(JSON.stringify({ files: files.length, errors, warnings: warns, findings: all, placeholders, ...(flags.has('--slop') ? { claims: CLAIMS } : {}), ...(contrast ? { contrast: { cssFiles: contrast.cssFiles, checked: contrast.checked, unresolved: contrast.unresolved } } : {}), ...(renders.length ? { render: renders } : {}) }, null, 2));
+  console.log(JSON.stringify({ settings: S, files: files.length, errors, warnings: warns, findings: all, placeholders, ...(flags.has('--slop') ? { claims: CLAIMS } : {}), ...(contrast ? { contrast: { cssFiles: contrast.cssFiles, checked: contrast.checked, unresolved: contrast.unresolved } } : {}), ...(renders.length ? { render: renders } : {}) }, null, 2));
 } else {
+  console.log(`Settings: ${describeSettings(S)}`);
+  for (const p of S.problems) console.log(`  ⚠ profile: ${p}`);
+  if (S.marketAssumed) console.log('  ⚠ The Iran market was ASSUMED from a Persian request — confirm with the owner (Iran rules make foreign hosts errors).');
   const byFile = new Map();
   for (const f of all) { if (!byFile.has(f.file)) byFile.set(f.file, []); byFile.get(f.file).push(f); }
   for (const [file, list] of byFile) {

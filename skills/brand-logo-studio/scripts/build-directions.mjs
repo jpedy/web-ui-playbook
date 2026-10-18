@@ -9,13 +9,14 @@
  * Show the sheet to the user and let them pick A, B or C; then run export-kit.mjs --direction <id>.
  */
 import path from 'node:path';
-import { loadBrief } from './lib/brief.mjs';
+import { loadBrief, preloadProfile } from './lib/brief.mjs';
 import { directionsSheet } from './lib/kit.mjs';
 import { outDir } from './lib/util.mjs';
 
 const args = process.argv.slice(2);
 const get = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
 if (!get('brief')) { console.log('Usage: node build-directions.mjs --brief brief.json [--out brand-kit]'); process.exit(2); }
+await preloadProfile(get('brief'));
 const brief = loadBrief(get('brief'));
 const out = outDir(get('out'));
 const file = path.join(out, 'directions.png');
