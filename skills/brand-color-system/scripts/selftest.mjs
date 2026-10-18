@@ -146,6 +146,18 @@ if (fs.existsSync(auditPath)) {
   const readJ = (d) => JSON.parse(fs.readFileSync(path.join(proj, d, 'palette.json'), 'utf8'));
   const g = run(['--market', 'global', '--out', path.join(proj, 'g')]);
   check(g.status === 0 && fs.existsSync(path.join(proj, 'g', 'palette.css')), '--market global is accepted (no Iranian brand table)');
+  const sh = run(['--format', 'tailwind4,shadcn', '--out', path.join(proj, 's')]);
+  const shCss = fs.existsSync(path.join(proj, 's', 'palette.shadcn.css')) ? fs.readFileSync(path.join(proj, 's', 'palette.shadcn.css'), 'utf8') : '';
+  const shJ = fs.existsSync(path.join(proj, 's', 'palette.json')) ? readJ('s') : null;
+  const NAMES = ['background', 'foreground', 'card', 'card-foreground', 'popover', 'popover-foreground', 'primary', 'primary-foreground', 'secondary', 'secondary-foreground', 'muted', 'muted-foreground', 'accent', 'accent-foreground', 'destructive', 'border', 'input', 'ring', 'chart-1', 'chart-5', 'sidebar', 'sidebar-ring'];
+  check(sh.status === 0 && fs.existsSync(path.join(proj, 's', 'palette.css')) && NAMES.every((n) => shCss.includes(`  --${n}: oklch(`) && shCss.includes(`--color-${n}: var(--${n});`)), '--format shadcn: every shadcn variable (OKLCH) in :root/.dark plus the @theme inline mapping; tailwind4 written too');
+  const rootBlock = shCss.split('.dark {')[0];
+  check(shJ && rootBlock.includes(`/* ${shJ.tokens.light.bg} = --bg`) && rootBlock.includes(`/* ${shJ.tokens.light['primary-fg']} = --primary-fg`) && rootBlock.includes(`/* ${shJ.tokens.light.muted} = --muted`), 'shadcn names carry the checked palette colors (background = bg, primary-foreground = primary-fg, muted-foreground = muted)');
+  check(/--radius-sm: calc\(var\(--radius\) \* 0\.6\);/.test(shCss) && /--radius-4xl: calc\(var\(--radius\) \* 2\.6\);/.test(shCss), 'shadcn radius scale (sm 0.6 … 4xl 2.6) as in the shadcn theming docs');
+  const { shadcnChecks } = await import('./formats.mjs');
+  const fake = { tokens: { light: { danger: '#ff6b6b' }, dark: { danger: '#b91c1c' } } };
+  const sc = shadcnChecks(fake);
+  check(sc.length === 1 && sc[0].mode === 'light' && /white text on --destructive/.test(sc[0].pair), 'shadcn: white text on a too-light --destructive is reported (the palette matrix does not check that pair)');
   const bad = run(['--format', 'nope', '--out', path.join(proj, 'x')]);
   check(bad.status === 2 && /available: /.test(bad.stderr) && !fs.existsSync(path.join(proj, 'x')), 'an unknown --format is refused (with the list) before anything is written');
   if (fs.existsSync(path.join(DIR, '..', '..', 'web-ui-playbook', 'scripts', 'profile.mjs'))) {

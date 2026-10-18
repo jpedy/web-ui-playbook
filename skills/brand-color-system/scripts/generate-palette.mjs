@@ -21,7 +21,8 @@
  *   --lang <l>               en (default) | fa | both — fa/both apply the 5.5:1 house rule to small text
  *   --market <m>             iran: also warn when the brand is close to a well-known Iranian brand
  *                            (data: references/iran-brand-colors.md, dated — verify) · global: no market table
- *   --format <list>          token files to write, comma-separated (default tailwind4): tailwind4 (palette.css)
+ *   --format <list>          token files to write, comma-separated (default tailwind4): tailwind4 (palette.css),
+ *                            shadcn (palette.shadcn.css — shadcn/ui variable names)
  *                            — formats per stack: web-ui-playbook references/stacks/<stack>.md
  *   Without --lang / --market, the project's .web-ui-playbook.json (web-ui-playbook profile) supplies them.
  *   --competitor "<hex>[:Name]"   extra competitor color (repeatable)
@@ -37,7 +38,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { STOPS, cssOklch, fmtRatio } from './color-core.mjs';
 import { buildPalette, parseBrandTable } from './palette-engine.mjs';
-import { FORMATS, ORDER, ROLE } from './formats.mjs';
+import { FORMATS, ORDER, ROLE, shadcnChecks } from './formats.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SKILL_DIR = path.resolve(SCRIPT_DIR, '..');
@@ -232,6 +233,7 @@ console.log(`  files: ${Object.keys(files).join(', ')}`);
 console.log(`  brand ${p.brand.hex} = brand-${p.brand.stop} · buttons ${p.tokens.light.primary} / ${p.tokens.light['primary-fg']} · links ${p.tokens.light['primary-ink']}`);
 for (const d of p.decisions) console.log(`  - ${d}`);
 for (const w of p.warnings) console.log(`  ⚠ ${w}`);
+if (formats.includes('shadcn')) for (const w of shadcnChecks(p)) console.log(`  ⚠ shadcn ${w.mode}: ${w.pair} = ${fmtRatio(w.ratio)}:1 (needs ${w.need}:1) — use dark text on it or the outline variant (note in palette.shadcn.css).`);
 const required = p.matrix.filter((m) => m.kind !== 'decor');
 console.log(`  contrast: ${required.length - p.failures.length}/${required.length} required pairs pass${p.cvd.length ? ` · ${new Set(p.cvd.map((c) => `${c.a}/${c.b}`)).size} status pair(s) look alike under color-vision deficiency (keep icons + words)` : ''}`);
 process.exit(p.failures.length ? 1 : 0);

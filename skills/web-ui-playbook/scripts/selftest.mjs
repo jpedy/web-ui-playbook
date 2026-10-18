@@ -132,6 +132,13 @@ const again = spawnSync(process.execPath, [DS, mono, '--init', '--stack', 'next'
 check(again.status === 2 && /already exists/.test(again.stderr), '--init never overwrites an existing profile without --force');
 fs.rmSync(mono, { recursive: true, force: true });
 
+// 3e. Next.js / JSX reader (fixtures/next-fa): cn() strings, TypeScript is not text, generics are not components
+const nx = audit([path.join(FX, 'next-fa'), '--contrast', '--css', path.join(DIR, '..', 'assets', 'tokens.css'), '--market', 'iran']);
+const pd = (nx.findings || []).filter((f) => f.rule === 'physical-direction').map((f) => f.msg);
+check(pd.length === 2 && pd.some((m) => /"ml-4"/.test(m)) && pd.some((m) => /"pl-2"/.test(m)), `JSX: physical classes inside cn() and className={'…'} are found (got ${pd.length})`);
+check(!(nx.findings || []).some((f) => /^(zwnj|fa-|arabic-|input-label|h1)/.test(f.rule)), `JSX: no findings from TypeScript code, the htmlFor label or the layout without <h1> (got: ${(nx.findings || []).filter((f) => f.rule !== 'physical-direction').map((f) => f.rule).join(', ') || 'none'})`);
+check(nx.contrast && !nx.contrast.unresolved.some((u) => u.why === 'component') && nx.contrast.unresolved.every((u) => u.reason === 'dynamic-class'), 'JSX: TypeScript generics are not read as components; cn() classes are "dynamic-class" (never passed)');
+
 // 3d. progressive disclosure: SKILL.md stays short; every stack adapter has the template's headings
 const skill = fs.readFileSync(path.join(DIR, '..', 'SKILL.md'), 'utf8');
 const desc = (skill.match(/^description: (.*)$/m) || [])[1] || '';
@@ -166,6 +173,22 @@ if (chrome) {
   check(/این بند بدون جاوااسکریپت دیده نمی‌شود/.test(njm), 'no-JS view: an ungated hide-before-reveal is reported');
   check(!/دروازهٔ html.js امن است/.test(njm), 'no-JS view: content hidden only under html.js is not reported');
   check(/x-text="name"/.test(njm) && /x-for=/.test(njm), 'no-JS view: x-text and <template x-for> content that needs JavaScript is reported');
+  // any stack: a running local server (reverse proxy) and a build folder give the same measurements as the file
+  const http = await import('node:http');
+  const srv = http.createServer((req, res) => { const f = path.join(FX, decodeURIComponent(new URL(req.url, 'http://x').pathname).replace(/^\/+/, '') || 'render-fa.html'); if (!fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); res.end(); return; } res.writeHead(200, { 'content-type': f.endsWith('.html') ? 'text/html; charset=utf-8' : 'application/octet-stream', 'content-security-policy': "script-src 'self'" }); res.end(fs.readFileSync(f)); });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const base = `http://localhost:${srv.address().port}`;
+  // async child: a blocking spawnSync would stall this test server, which runs in the same process
+  const ur = await (async () => { const { spawn } = await import('node:child_process'); return new Promise((resolve) => { let o = ''; const c = spawn(process.execPath, [AUDIT, rfile, '--render', `${base}/render-fa.html`, '--json'], { cwd: DIR }); c.stdout.on('data', (d) => (o += d)); c.on('close', () => resolve(JSON.parse(o))); }); })();
+  const urErr = (ur.findings || []).filter((f) => f.rule === 'render-contrast').map((f) => f.msg).join('\n');
+  check(ur.render?.[0].status === 'ok' && ur.render[0].kind === 'url' && /رنگ این متن بعد از اجرای اسکریپت/.test(urErr) && /فقط در فریم انیمیشن/.test(urErr), 'render URL mode: a running local server is measured through the audit proxy (its CSP header is dropped so the probe runs) with the same findings');
+  srv.close();
+  const dr = audit([rfile, '--render', FX, '--pages', 'render-fa']);
+  check(dr.render?.[0].status === 'ok' && dr.render[0].kind === 'dir' && (dr.findings || []).some((f) => f.rule === 'render-contrast'), 'render folder mode: --render <build folder> --pages <name> (clean URL /render-fa → render-fa.html)');
+  const down = audit([rfile, '--render', 'http://127.0.0.1:9/']);
+  check(down.render?.[0].status === 'error' && (down.findings || []).some((f) => f.rule === 'render' && f.sev === 'error' && /not reachable/.test(f.msg)), 'render: an unreachable local server is an ERROR, never "skipped"');
+  const remote = audit([rfile, '--render', 'https://example.com/']);
+  check(remote.render?.[0].status === 'error' && /only local URLs/.test(remote.render[0].reason), 'render: remote URLs are refused (local hosts only)');
 } else console.log('(no Chrome/Edge found: --render checks not run)');
 const sk = audit([rfile, '--render', rfile], { CHROME_PATH: 'none' });
 check(sk.render?.[0].status === 'skipped' && !(sk.findings || []).some((f) => f.rule.startsWith('render')), 'no browser → render "skipped", nothing passed, nothing downloaded');

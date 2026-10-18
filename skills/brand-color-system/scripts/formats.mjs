@@ -3,9 +3,10 @@
  * One palette (the object buildPalette() returns) → token files for each stack. generate-palette.mjs --format picks
  * them; every format carries the same checked colors, so the contrast results in palette-report.md hold for all.
  *   tailwind4   palette.css — :root/.dark variables + @theme inline (Laravel, Next.js with Tailwind v4, static + Tailwind CLI)
+ *   shadcn      palette.shadcn.css — shadcn/ui variable names (Next.js + shadcn, Inertia + React + shadcn)
  * Which format a stack uses: web-ui-playbook references/stacks/<stack>.md ("Where tokens live").
  */
-import { cssOklch, fmtRatio } from './color-core.mjs';
+import { cssOklch, fmtRatio, contrast, parseColor } from './color-core.mjs';
 
 export const ORDER = ['bg', 'surface', 'surface-subtle', 'border', 'border-strong', 'text', 'muted',
   'primary', 'primary-hover', 'primary-fg', 'primary-subtle', 'primary-ink', 'brand', 'accent', 'accent-fg',
@@ -72,11 +73,79 @@ ${p.scales.accent !== p.scales.brand ? scaleDecl('accent', p.scales.accent) + '\
 `;
 }
 
+// shadcn/ui variable names (ui.shadcn.com/docs/theming ⏱ 2026-10-18: OKLCH values, :root + .dark, @theme inline,
+// --radius 0.625rem with sm…4xl multipliers; no --destructive-foreground). Every pair maps onto a pair the palette
+// already checked: name → [our token, the checked pair it relies on].
+const SHADCN = [
+  ['background', 'bg'], ['foreground', 'text', 'text on bg'],
+  ['card', 'surface'], ['card-foreground', 'text', 'text on surface'],
+  ['popover', 'surface'], ['popover-foreground', 'text', 'text on surface'],
+  ['primary', 'primary'], ['primary-foreground', 'primary-fg', 'primary-fg on primary'],
+  ['secondary', 'surface-subtle'], ['secondary-foreground', 'text', 'text on surface-subtle'],
+  ['muted', 'surface-subtle'], ['muted-foreground', 'muted', 'muted on surface-subtle'],
+  ['accent', 'surface-subtle'], ['accent-foreground', 'text', 'text on surface-subtle'],
+  ['destructive', 'danger', 'danger on surface'],
+  ['border', 'border'], ['input', 'border-strong', 'border-strong on surface (3:1)'], ['ring', 'focus', 'focus on bg (3:1)'],
+  ['sidebar', 'surface'], ['sidebar-foreground', 'text', 'text on surface'], ['sidebar-primary', 'primary'], ['sidebar-primary-foreground', 'primary-fg', 'primary-fg on primary'],
+  ['sidebar-accent', 'surface-subtle'], ['sidebar-accent-foreground', 'text', 'text on surface-subtle'], ['sidebar-border', 'border'], ['sidebar-ring', 'focus'],
+  // not in shadcn: the plugin's status, link and brand colors (use text-success, text-primary-ink, bg-brand…)
+  ['success', 'success'], ['warning', 'warning'], ['info', 'info'], ['primary-ink', 'primary-ink'], ['brand', 'brand'],
+];
+const RADIUS = [['sm', 0.6], ['md', 0.8], ['lg', 1], ['xl', 1.4], ['2xl', 1.8], ['3xl', 2.2], ['4xl', 2.6]];
+
+/** Extra checks the shadcn names need beyond the palette matrix → [{ mode, pair, ratio, need }] below target. */
+export function shadcnChecks(p) {
+  const out = [];
+  for (const mode of ['light', 'dark']) {
+    const t = p.tokens[mode];
+    const r = contrast(parseColor('#ffffff'), parseColor(t.danger));
+    if (r < 4.5) out.push({ mode, pair: 'white text on --destructive (a filled destructive button)', ratio: r, need: 4.5 });
+  }
+  return out;
+}
+
+function shadcn(p) {
+  const chart = [p.scales.brand[6], p.scales.accent[5], p.scales.brand[3], p.scales.accent[7], p.scales.base[5]].map((s) => s.hex);
+  const block = (mode) => SHADCN.map(([name, tok, pair]) => `  --${name}: ${cssOklch(p.tokens[mode][tok])}; /* ${p.tokens[mode][tok]} = --${tok}${pair ? ` · checked: ${pair}` : ''} */`)
+    .concat(chart.map((h, i) => `  --chart-${i + 1}: ${cssOklch(h)}; /* ${h} — label every series; never color alone */`)).join('\n');
+  const warn = shadcnChecks(p);
+  return `/* ==========================================================================
+   Brand palette — ${p.meta.name} — shadcn/ui variables (OKLCH)
+   Generated ${p.meta.generated} by brand-color-system/scripts/generate-palette.mjs --format shadcn
+   Brand color ${p.brand.hex} kept exactly as --brand. Every foreground/background pair shadcn uses maps onto a pair
+   checked in palette-report.md (WCAG 2.2 AA${p.meta.fa ? '; Persian small text ≥ 5.5:1 house rule' : ''}).
+${warn.length ? warn.map((w) => `   ⚠ ${w.mode}: ${w.pair} = ${fmtRatio(w.ratio)}:1 (needs ${w.need}:1) — use dark text on it or the outline variant.`).join('\n') + '\n' : ''}
+   Use: replace the color variables in your global CSS (e.g. app/globals.css) with this file's :root/.dark/@theme
+   blocks, or @import it after @import "tailwindcss". --radius is shadcn's default — set it from the design commitment.
+   ========================================================================== */
+
+:root {
+  --radius: 0.625rem;
+${block('light')}
+}
+
+.dark {
+${block('dark')}
+  color-scheme: dark;
+}
+
+@theme inline {
+${[...SHADCN.map(([n]) => n), ...chart.map((_, i) => `chart-${i + 1}`)].map((n) => `  --color-${n}: var(--${n});`).join('\n')}
+${RADIUS.map(([k, m]) => `  --radius-${k}: ${m === 1 ? 'var(--radius)' : `calc(var(--radius) * ${m})`};`).join('\n')}
+}
+`;
+}
+
 /** name → { file, build(p) → text, install: plain-words first step for palette-report.md } */
 export const FORMATS = {
   tailwind4: {
     file: 'palette.css',
     build: tailwind4,
     install: 'Copy `palette.css` next to `tokens.css` (web-ui-playbook) and add `@import "./palette.css";` right after the tokens import.',
+  },
+  shadcn: {
+    file: 'palette.shadcn.css',
+    build: shadcn,
+    install: 'shadcn/ui project: replace the color variables in your global CSS (Next.js: `app/globals.css`) with the `:root`, `.dark` and `@theme inline` blocks of `palette.shadcn.css` (keep `@import "tailwindcss";` first).',
   },
 };

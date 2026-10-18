@@ -16,6 +16,11 @@
  * IntersectionObserver reports every element as visible (reveal-on-scroll, x-intersect), and transitions/
  * animations are off (elements show their end state). Only the state shown after load is measured.
  * No Chrome → { status: 'skipped' }: nothing is downloaded and nothing is counted as passed.
+ * Targets: a built .html file · a build folder (out/, dist/, _site/ — clean URLs, opts.page picks the page) · a running
+ * LOCAL server (http://localhost:3000/…, 127.0.0.1, [::1] only): the local audit server then works as a reverse proxy,
+ * injects the probe into HTML responses (and drops their Content-Security-Policy so it can run) and passes everything
+ * else through, so the page stays same-origin with the measuring frame. An unreachable target is { status: 'error' }.
+ * Unresolved texts carry a reason code: gradient-or-image-bg · transparent-text (never counted as passed).
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -59,7 +64,7 @@ function hex(c){return'#'+c.slice(0,3).map(function(v){return Math.round(v).toSt
 function name(el){return el.tagName.toLowerCase()+(el.id?'#'+el.id:'')+(typeof el.className==='string'&&el.className.trim()?'.'+el.className.trim().split(/\\s+/).slice(0,3).join('.'):'');}
 function pathOf(el){var p=[];while(el&&el.nodeType===1&&el!==document.body){var i=1,s=el;while((s=s.previousElementSibling))i++;p.unshift(el.tagName.toLowerCase()+':'+i);el=el.parentElement;}return p.join('>');}
 function measure(){
- var out={note:window.__note||null,texts:[],headlines:[],overflow:document.documentElement.scrollWidth-innerWidth,fonts:[],alpine:window.Alpine?(window.Alpine.version||'yes'):null,livewire:!!window.Livewire,external:[]};
+ var out={note:window.__note||null,texts:[],headlines:[],overflow:document.documentElement.scrollWidth-innerWidth,fonts:[],alpine:window.Alpine?(window.Alpine.version||'yes'):null,livewire:!!window.Livewire,ssr:!!(document.getElementById('__NEXT_DATA__')||window.__next_f||window.__NUXT__||document.querySelector('astro-island,[data-sveltekit-hydrate],script[data-sveltekit-fetched]')),external:[]};
  var page=rgba(getComputedStyle(document.documentElement).backgroundColor);if(page[3]<1)page=over(page,rgba(getComputedStyle(document.body).backgroundColor));if(page[3]<1)page=over(page,[255,255,255,1]);
  document.querySelectorAll('body *').forEach(function(el){
   if(el.closest('script,style,svg,noscript,template')||el.id==='__audit_result')return;
@@ -69,9 +74,9 @@ function measure(){
   if(!r.width||!r.height||cs.visibility==='hidden'||cs.display==='none'){rec.why='hidden';rec.msg='not visible (display:'+cs.display+')';out.texts.push(rec);return;}
   var op=1,n=el;while(n&&n.nodeType===1){op*=parseFloat(getComputedStyle(n).opacity);n=n.parentElement;}
   if(op<0.05){rec.why='hidden';out.texts.push(rec);return;}
-  var fg=rgba(cs.color);if(fg[3]===0||cs.webkitTextFillColor==='transparent'||cs.color==='transparent'){rec.why='image';rec.msg='transparent text (gradient/clipped)';out.texts.push(rec);return;}
+  var fg=rgba(cs.color);if(fg[3]===0||cs.webkitTextFillColor==='transparent'||cs.color==='transparent'){rec.why='image';rec.reason='transparent-text';rec.msg='transparent text (gradient/clipped)';out.texts.push(rec);return;}
   var layers=[],bg=null;n=el;
-  while(n&&n.nodeType===1){var s=getComputedStyle(n);if(s.backgroundImage&&s.backgroundImage!=='none'){rec.why='image';rec.msg='background image/gradient on '+name(n);break;}var c=rgba(s.backgroundColor);if(c[3]>0){layers.push(c);if(c[3]>=1){bg=c;break;}}n=n.parentElement;}
+  while(n&&n.nodeType===1){var s=getComputedStyle(n);if(s.backgroundImage&&s.backgroundImage!=='none'){rec.why='image';rec.reason='gradient-or-image-bg';rec.msg='background image/gradient on '+name(n);break;}var c=rgba(s.backgroundColor);if(c[3]>0){layers.push(c);if(c[3]>=1){bg=c;break;}}n=n.parentElement;}
   if(rec.why){out.texts.push(rec);return;}
   if(!bg)bg=page;for(var i=layers.length-1;i>=0;i--){if(layers[i]!==bg)bg=over(layers[i],bg);}
   var f=over([fg[0],fg[1],fg[2],fg[3]*op],bg);
@@ -121,41 +126,92 @@ f.addEventListener('load',function(){setTimeout(function(){
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.avif': 'image/avif', '.gif': 'image/gif', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf' };
 
-/** Serve `root` on 127.0.0.1 (random port); the page `pageRel` gets the probe injected. */
-function serve(root, pageRel, waitMs) {
+const STATIC_STYLE = '<style id="__audit_static">*,*::before,*::after{transition:none!important;animation:none!important}html{scrollbar-width:none}</style>';
+const withParam = (p, k, v) => `${p}${p.includes('?') ? '&' : '?'}${k}=${v}`;
+/** The page as the audit serves it: probe (with JS) or static CSS only (no-JS view). */
+function inject(html, nojs, waitMs) {
+  if (nojs) return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (h) => h + STATIC_STYLE) : STATIC_STYLE + html;
+  const withPre = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (h) => h + PRE) : PRE + html;
+  return /<\/body>/i.test(withPre) ? withPre.replace(/<\/body>/i, `${PROBE(waitMs)}</body>`) : withPre + PROBE(waitMs);
+}
+/** A file in a static folder: exact file, folder/index.html, or a clean URL (/about → about.html). */
+function staticFile(root, rel) {
+  const base = path.resolve(root, rel);
+  if (!base.startsWith(path.resolve(root))) return null;
+  for (const c of [base, path.join(base, 'index.html'), `${base}.html`]) if (fs.existsSync(c) && fs.statSync(c).isFile()) return c;
+  return null;
+}
+
+/**
+ * Serve the target on 127.0.0.1 (random port). source = { kind: 'file', root, pageRel } | { kind: 'dir', root } |
+ * { kind: 'url', origin }. HTML requested with __audit_mode gets the probe; with __audit_nojs the static CSS only.
+ */
+function serve(source, page, waitMs) {
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
       const u = new URL(req.url, 'http://127.0.0.1');
       if (u.pathname === '/__audit_frame.html') { // wrapper: frames the page at exactly w × h (its own viewport)
         const w = Number(u.searchParams.get('w')), h = Number(u.searchParams.get('h')), mode = u.searchParams.get('mode');
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-        res.end(`<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:#fff}iframe{border:0;display:block}</style><iframe width="${w}" height="${h}" src="/${pageRel}?__audit_mode=${mode}"></iframe><script>addEventListener('message',function(e){if(e.data&&e.data.__audit){var s=document.createElement('script');s.type='application/json';s.id='__audit_result';s.textContent=e.data.__audit;document.body.appendChild(s);}});</script>`);
+        res.end(`<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:#fff}iframe{border:0;display:block}</style><iframe width="${w}" height="${h}" src="${withParam(page, '__audit_mode', mode)}"></iframe><script>addEventListener('message',function(e){if(e.data&&e.data.__audit){var s=document.createElement('script');s.type='application/json';s.id='__audit_result';s.textContent=e.data.__audit;document.body.appendChild(s);}});</script>`);
         return;
       }
       if (u.pathname === '/__audit_nojs.html') {
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-        res.end(NOJS_WRAPPER(Number(u.searchParams.get('w')), Number(u.searchParams.get('h')), `/${pageRel}?__audit_nojs=1`));
+        res.end(NOJS_WRAPPER(Number(u.searchParams.get('w')), Number(u.searchParams.get('h')), withParam(page, '__audit_nojs', '1')));
         return;
       }
+      const nojs = u.searchParams.has('__audit_nojs'), probed = nojs || u.searchParams.has('__audit_mode');
+      u.searchParams.delete('__audit_nojs'); u.searchParams.delete('__audit_mode');
+      if (source.kind === 'url') return proxy(source.origin, req, res, u, probed, nojs, waitMs);
       const rel = decodeURIComponent(u.pathname).replace(/^\/+/, '');
-      const file = path.resolve(root, rel || pageRel);
-      if (!file.startsWith(path.resolve(root)) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); res.end(); return; }
+      const file = source.kind === 'file' ? (rel ? staticFile(source.root, rel) : path.resolve(source.root, source.pageRel)) : staticFile(source.root, rel || '.');
+      if (!file) { res.writeHead(404); res.end(); return; }
       let body = fs.readFileSync(file);
-      if (path.resolve(file) === path.resolve(root, pageRel)) {
-        const html = body.toString('utf8');
-        if (u.searchParams.has('__audit_nojs')) { // no-JS view: static CSS only (see NOJS_WRAPPER)
-          const style = '<style id="__audit_static">*,*::before,*::after{transition:none!important;animation:none!important}html{scrollbar-width:none}</style>';
-          res.writeHead(200, { 'content-type': TYPES['.html'], 'cache-control': 'no-store' });
-          res.end(/<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (h) => h + style) : style + html);
-          return;
-        }
-        const withPre =/<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (h) => h + PRE) : PRE + html;
-        body = Buffer.from(/<\/body>/i.test(withPre) ? withPre.replace(/<\/body>/i, `${PROBE(waitMs)}</body>`) : withPre + PROBE(waitMs));
-      }
+      if (probed && /\.html?$/i.test(file)) body = Buffer.from(inject(body.toString('utf8'), nojs, waitMs));
       res.writeHead(200, { 'content-type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream', 'cache-control': 'no-store' });
       res.end(body);
     });
     server.listen(0, '127.0.0.1', () => resolve(server));
+  });
+}
+
+/** Reverse proxy to the user's local server; HTML pages under test get the probe. */
+function proxy(origin, req, res, u, probed, nojs, waitMs) {
+  const up = new URL(origin);
+  const headers = { ...req.headers, host: up.host, 'accept-encoding': 'identity' };
+  delete headers.referer; delete headers.origin;
+  const r = http.request({ hostname: up.hostname, port: up.port || 80, path: u.pathname + u.search, method: req.method, headers }, (pr) => {
+    const h = { ...pr.headers };
+    if (h.location) { // keep redirects on the audit server, and keep the page under test
+      let loc = h.location.startsWith(up.origin) ? h.location.slice(up.origin.length) || '/' : h.location;
+      if (probed && loc.startsWith('/')) loc = withParam(loc, nojs ? '__audit_nojs' : '__audit_mode', nojs ? '1' : new URL(req.url, 'http://x').searchParams.get('__audit_mode'));
+      h.location = loc;
+    }
+    if (probed && /text\/html/i.test(h['content-type'] || '')) {
+      const chunks = [];
+      pr.on('data', (c) => chunks.push(c));
+      pr.on('end', () => {
+        for (const k of ['content-length', 'content-encoding', 'etag', 'content-security-policy', 'content-security-policy-report-only']) delete h[k];
+        h['cache-control'] = 'no-store';
+        res.writeHead(pr.statusCode, h);
+        res.end(inject(Buffer.concat(chunks).toString('utf8'), nojs, waitMs));
+      });
+      return;
+    }
+    res.writeHead(pr.statusCode, h);
+    pr.pipe(res);
+  });
+  r.on('error', (e) => { res.writeHead(502); res.end(`audit proxy: ${e.message}`); });
+  req.pipe(r);
+}
+
+/** GET a local URL → { ok, status, error } (before starting the browser). */
+function reach(url) {
+  return new Promise((resolve) => {
+    const r = http.get(url, { headers: { 'accept-encoding': 'identity' }, timeout: 15000 }, (res) => { res.resume(); resolve({ ok: res.statusCode < 500, status: res.statusCode }); });
+    r.on('timeout', () => r.destroy(new Error('no answer within 15 s')));
+    r.on('error', (e) => resolve({ ok: false, error: e.message }));
   });
 }
 
@@ -176,17 +232,36 @@ function dumpDom(chrome, url, width, height, dark) {
 }
 
 /**
- * @param htmlFile built page (.html) — Blade must be rendered first (save the HTML Laravel serves)
- * @param opts { root (folder the page's /assets resolve from; default: nearest "public" folder, else the page's folder), widths, modes, waitMs }
+ * @param target built page (.html) · build folder · local URL (http://localhost:3000/path) — Blade/PHP must be rendered
+ *               first (save the HTML) or served (URL)
+ * @param opts { root (file targets: folder the page's /assets resolve from; default: nearest "public" folder, else the
+ *               page's folder), page (folder targets: path to render, default "/"), widths, modes, waitMs, nojs }
  */
-export async function renderAudit(htmlFile, opts = {}) {
+export async function renderAudit(target, opts = {}) {
   const chrome = findChrome();
   if (!chrome) return { status: 'skipped', reason: 'no Chrome, Edge or Chromium found (set CHROME_PATH to use one; nothing is downloaded)', runs: [] };
-  const abs = path.resolve(htmlFile);
-  let root = opts.root ? path.resolve(opts.root) : null;
-  if (!root) { let d = path.dirname(abs); while (d !== path.dirname(d) && path.basename(d) !== 'public') d = path.dirname(d); root = path.basename(d) === 'public' ? d : path.dirname(abs); }
-  const pageRel = path.relative(root, abs).replace(/\\/g, '/');
-  const server = await serve(root, pageRel, opts.waitMs ?? 1500);
+  let source, page, root = null, pageRel;
+  if (/^https?:\/\//i.test(target)) {
+    const t = new URL(target);
+    if (!['localhost', '127.0.0.1', '[::1]', '::1'].includes(t.hostname)) return { status: 'error', reason: `only local URLs can be rendered (localhost, 127.0.0.1, [::1]) — not ${t.hostname}`, runs: [] };
+    if (t.protocol !== 'http:') return { status: 'error', reason: 'only http:// local servers are supported (start the dev/production server without TLS)', runs: [] };
+    const origin = `http://${t.hostname === 'localhost' ? '127.0.0.1' : t.hostname}:${t.port || 80}`;
+    const ok = await reach(origin + t.pathname + t.search);
+    if (!ok.ok) return { status: 'error', reason: `${target} is not reachable (${ok.error || `HTTP ${ok.status}`}) — start the server first`, runs: [] };
+    source = { kind: 'url', origin }; page = t.pathname + t.search; pageRel = page;
+  } else if (fs.existsSync(target) && fs.statSync(target).isDirectory()) {
+    root = path.resolve(target); page = opts.page || '/';
+    if (!staticFile(root, page.replace(/^\/+/, '') || '.')) return { status: 'error', reason: `${page} not found in ${target}`, runs: [] };
+    source = { kind: 'dir', root }; pageRel = page;
+  } else {
+    if (!fs.existsSync(target)) return { status: 'error', reason: `${target} not found`, runs: [] };
+    const abs = path.resolve(target);
+    root = opts.root ? path.resolve(opts.root) : null;
+    if (!root) { let d = path.dirname(abs); while (d !== path.dirname(d) && path.basename(d) !== 'public') d = path.dirname(d); root = path.basename(d) === 'public' ? d : path.dirname(abs); }
+    pageRel = path.relative(root, abs).replace(/\\/g, '/');
+    source = { kind: 'file', root, pageRel }; page = `/${pageRel}`;
+  }
+  const server = await serve(source, page, opts.waitMs ?? 1500);
   const port = server.address().port, runs = [];
   try {
     const widths = opts.widths || [1440, 768, 375], modes = opts.modes || ['light', 'dark'];
@@ -215,6 +290,6 @@ export async function renderAudit(htmlFile, opts = {}) {
           empty: r.empty };
       }
     }
-    return { status: 'ok', browser: chrome, root, page: pageRel, runs, nojs };
+    return { status: 'ok', browser: chrome, root, kind: source.kind, page: pageRel, runs, nojs };
   } finally { server.close(); }
 }

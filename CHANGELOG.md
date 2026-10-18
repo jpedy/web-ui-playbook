@@ -13,6 +13,15 @@
 - `generate-palette.mjs --format` (token formats in `scripts/formats.mjs`; `tailwind4` = the previous output, byte-identical) and `--market global`; language and market default to the profile.
 - brand-logo-studio: per-stack integration files (`lib/integrations.mjs`; Laravel's `head-snippet.blade.php` unchanged); the kit report shows Iran legal notes only for market Iran, a neutral trademark note otherwise, and says when the market was not set.
 
+### Next.js (Tier 1)
+- **`references/stacks/next.md`** — Next.js 16 App Router adapter, verified 2026-10-18 against the Next.js docs (and the docs shipped in `node_modules/next/dist/docs`), next-intl, shadcn/ui and react.dev: `next/font/local` required (why `next/font/google` fails for Iran builds), `proxy.ts` (renamed from `middleware.ts`), `[lang]` + `dir`, Cache Components rules, app icon file conventions, `metadataBase`, Server Functions + `useActionState`, html.js gate before hydration, Windows `&`-path and static-export pitfalls found in testing.
+- **JSX/TSX reader** (`scripts/parsers/jsx.mjs`): class strings inside `cn()/clsx()/cva()/twMerge()` and `className={'…'}`; visible text only between JSX tags (TypeScript is not text); TypeScript generics are not components; `htmlFor` labels; layouts without `<h1>`.
+- **`--render` for any stack:** a running **local** server (`--render http://localhost:3000/path`, reverse-proxied; other hosts refused), a build folder (`--render out --pages /,/about`) or a file. An unreachable target is an **error**, never "skipped". Unresolved texts carry fixed reason codes. Server-rendered pages (Next.js, Nuxt, SvelteKit, Astro) count their initial dynamic classes as applied.
+- **`--format shadcn`** — shadcn/ui variable names in OKLCH (every pair maps onto a checked palette pair; warns when white text on `--destructive` is too faint).
+- Logo kit **stack `next`**: `next-app/` with `favicon.ico`, `icon.svg`, `apple-icon.png`, `opengraph-image.png` (+alt), `manifest.json`, a `viewport` snippet and a README.
+- Audit: the html.js gate is found in any audited file (layouts); the palette generator's preview page is not audited; `--pages` survives Git Bash's path rewriting.
+- Tested: production builds of a Persian shop product page (market Iran) and an English SaaS landing (global, shadcn, static export) — results in the README support matrix.
+
 ### Internal
 - Markup readers moved to `scripts/parsers/` unchanged (each audit rule exists once for every stack).
 - `performance-and-tech.md` is stack-neutral now; Laravel setup, Blade components, Livewire/Filament/Inertia notes moved to `references/stacks/laravel.md` (updated to current versions).

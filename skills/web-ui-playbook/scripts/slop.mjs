@@ -77,7 +77,10 @@ const inside = (idx, rs) => rs.some(([a, b]) => idx >= a && idx < b);
  * @param o { file, raw, src (comments blanked), vis (visible text, same positions), lineOf, ignored:Set<line>, allow }
  * @returns { findings: [{file,line,sev:'warn',rule,msg}], claims: [{file,line,kind,text,placeholder}] }
  */
-export function slopAudit({ file, raw, src, vis, lineOf, ignored, allow }) {
+/** The html.js gate: a no-JS fallback for hide-before-reveal styles (components-and-states.md, motion baseline). */
+export const GATE_RE = /html\.js|documentElement\.classList\.add\(\s*['"]js['"]|class\s*=\s*["'][^"']*\bno-js\b/;
+
+export function slopAudit({ file, raw, src, vis, lineOf, ignored, allow, gateElsewhere = false }) {
   const findings = [], claims = [];
   const rawLines = raw.split('\n');
   const add = (rule, idx, msg) => {
@@ -223,6 +226,6 @@ export function slopAudit({ file, raw, src, vis, lineOf, ignored, allow }) {
   const secs = [...src.matchAll(/<section\b[^>]*>/gi)].map((m) => ({ idx: m.index, fp: [...new Set(src.slice(m.index, m.index + 700).match(/\b(?:(?:sm|md|lg|xl):)?(?:grid-cols-\d+|flex-row|flex-col|grid|columns-\d+)\b/g) || [])].sort().join(' ') }));
   for (let i = 2; i < secs.length; i++) if (secs[i].fp && secs[i].fp === secs[i - 1].fp && secs[i].fp === secs[i - 2].fp) { add('slop-repeat-sections', secs[i].idx, `3 sections in a row with the same layout (${secs[i].fp}) — vary the rhythm (statement, table, split, list).`); break; }
   // motion baseline: content hidden until JS runs, without a no-JS gate
-  if (/x-intersect|data-reveal|\breveal\b/.test(src) && !/html\.js|documentElement\.classList\.add\(\s*['"]js['"]|class\s*=\s*["'][^"']*\bno-js\b/.test(raw)) add('slop-reveal-gate', src.search(/x-intersect|data-reveal|\breveal\b/), 'scroll reveals without an html.js gate — if JS fails (common on slow connections) the content stays invisible. Add the gate (components-and-states.md, motion baseline).');
+  if (/x-intersect|data-reveal|\breveal\b/.test(src) && !GATE_RE.test(raw) && !gateElsewhere) add('slop-reveal-gate', src.search(/x-intersect|data-reveal|\breveal\b/), 'scroll reveals without an html.js gate — if JS fails (common on slow connections) the content stays invisible. Add the gate (components-and-states.md, motion baseline).');
   return { findings, claims };
 }

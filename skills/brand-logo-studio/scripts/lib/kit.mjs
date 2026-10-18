@@ -158,7 +158,7 @@ export async function exportKit(brief, dirId, out) {
     { src: '/brand/png/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/brand/png/icon-512.png', sizes: '512x512', type: 'image/png' },
     { src: '/brand/png/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }], theme_color: c.primary, background_color: c.lightBg, display: 'standalone', dir: brief.name.fa ? 'rtl' : 'ltr', lang: brief.name.fa ? 'fa' : 'en' }, null, 2));
   const integ = integrationFor(brief.stack);
-  for (const [name, text] of integ.files({ c, brief })) {
+  for (const [name, text] of integ.files({ c, brief, out })) {
     fs.mkdirSync(path.dirname(path.join(out, name)), { recursive: true });
     write(path.join(out, name), text);
   }

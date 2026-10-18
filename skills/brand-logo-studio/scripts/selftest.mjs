@@ -204,6 +204,17 @@ if (chrome) {
   process.chdir(cwd0);
   check(d.market === 'iran' && d.marketSource === 'default' && /Market not set/.test(rep(d)), 'no market anywhere → the original default (iran), and the report says the market was not set');
   fs.rmSync(proj, { recursive: true, force: true }); fs.rmSync(proj2, { recursive: true, force: true });
+  // stack next: files named for the App Router conventions, copied byte-for-byte from the kit
+  const kitDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bls-next-'));
+  fs.mkdirSync(path.join(kitDir, 'png'));
+  for (const [f, v] of [['favicon.ico', 'ICO'], ['favicon.svg', '<svg/>'], ['png/apple-touch-icon.png', 'APPLE'], ['png/og-image.png', 'OG']]) fs.writeFileSync(path.join(kitDir, f), v);
+  const nf = Object.fromEntries(integrationFor('next').files({ c: { primary: '#0d9488', lightBg: '#ffffff', darkBg: '#060807' }, brief: { name: { fa: 'زبان‌سرا', en: 'Zabansara' } }, out: kitDir }));
+  const want = ['next-app/favicon.ico', 'next-app/icon.svg', 'next-app/apple-icon.png', 'next-app/opengraph-image.png', 'next-app/opengraph-image.alt.txt', 'next-app/manifest.json', 'next-app/viewport.ts.txt', 'next-app/README.md'];
+  check(want.every((f) => f in nf) && String(nf['next-app/favicon.ico']) === 'ICO' && String(nf['next-app/apple-icon.png']) === 'APPLE' && String(nf['next-app/icon.svg']) === '<svg/>', 'stack next: favicon.ico, icon.svg, apple-icon.png, opengraph-image.png (+alt), manifest.json, viewport snippet and README, copied from the kit');
+  const man = JSON.parse(nf['next-app/manifest.json']);
+  check(man.dir === 'rtl' && man.lang === 'fa' && man.icons.some((i) => i.purpose === 'maskable') && /themeColor/.test(nf['next-app/viewport.ts.txt']) && /metadataBase/.test(nf['next-app/README.md']) && /top-level/.test(nf['next-app/README.md']), 'stack next: RTL manifest with a maskable icon; theme color via viewport; README says top-level app/ and metadataBase');
+  check(integrationFor('wix-or-unknown').stack === 'laravel', 'unknown stack falls back to the Laravel integration (the original default)');
+  fs.rmSync(kitDir, { recursive: true, force: true });
 }
 
 const saved = process.env.CHROME_PATH;

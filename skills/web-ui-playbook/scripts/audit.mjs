@@ -21,7 +21,9 @@
  *   --slop       generic-page tells as warnings (data/fa-slop.json, data/en-slop.json; project overrides in
  *                .slop-allow.json) and a list of every number claim and quote for the OWNER to confirm.
  *                The audit cannot verify truth; passing it does not prove the page is good.
- *   --render     open a built page in the installed Chrome/Edge (headless, local server, no network) and measure
+ *   --render <target>  a built .html page, a build folder (out/, dist/; --pages /,/about picks pages) or a running LOCAL
+ *                server (http://localhost:3000/path; other hosts are refused). Opens it in the installed Chrome/Edge (headless,
+ *                local server or reverse proxy, no network) and measures
  *                real colors after JS/Alpine ran (light + dark), overflow and headline lines at 1440/768/375,
  *                loaded fonts and Persian text under 13px. Resolves pairs --contrast could not. No browser → skipped.
  *                Also opens the page with JavaScript off and reports content that is hidden or empty without JS.
@@ -34,7 +36,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { slopAudit, loadAllow } from './slop.mjs';
+import { slopAudit, loadAllow, GATE_RE } from './slop.mjs';
 import { renderAudit } from './render.mjs';
 import { releaseChecks } from './release.mjs';
 import { EXT, parserFor } from './parsers/index.mjs';
@@ -44,7 +46,7 @@ import { loadProfile, resolveSettings, describeSettings } from './profile.mjs';
 const isMain = !!process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 const args = isMain ? process.argv.slice(2) : [];
 const flags = new Set(args.filter((a) => a.startsWith('--')));
-const VALUE_FLAGS = ['--css', '--render', '--render-root', '--market', '--lang', '--stack', '--profile'];
+const VALUE_FLAGS = ['--css', '--render', '--render-root', '--pages', '--market', '--lang', '--stack', '--profile'];
 const valuesOf = (f) => args.flatMap((a, i) => (args[i - 1] === f ? [a] : []));
 const cssArgs = valuesOf('--css');
 const targets = args.filter((a, i) => !a.startsWith('--') && !VALUE_FLAGS.includes(args[i - 1]));
@@ -57,6 +59,7 @@ const profileArg = valuesOf('--profile')[0];
 const PROFILE = isMain ? (loadProfile({ file: profileArg, start: process.cwd() }) || (!profileArg && targets[0] && fs.existsSync(targets[0]) ? loadProfile({ start: targets[0] }) : null)) : null;
 const S = isMain ? resolveSettings(args, { profile: PROFILE }) : { market: null, forceRtl: false, cssDirs: null, problems: [] };
 const IRAN = S.market === 'iran';
+let GATE_ANY = false; // an html.js gate found in any audited file (set before auditing)
 
 const SKIP_DIR = /^(node_modules|vendor|\.git|dist|build|storage|bootstrap|\.next|\.nuxt|coverage)$/;
 
@@ -67,7 +70,7 @@ function walk(p, out = []) {
       if (SKIP_DIR.test(name)) continue;
       walk(path.join(p, name), out);
     }
-  } else if (EXT.test(p) && !/\.min\.css$/i.test(p)) out.push(p);
+  } else if (EXT.test(p) && !/\.min\.css$/i.test(p) && !/palette-preview\.html$/i.test(p)) out.push(p); // not the palette generator's preview
   return out;
 }
 
@@ -199,7 +202,7 @@ function auditFile(file) {
       if (!/\blang\s*=/.test(htmlTag[0])) add('error', 'html-lang', htmlTag.index, '<html> has no lang attribute.');
       if (persianCount > 20 && !/\bdir\s*=/.test(src)) add('error', 'html-dir', htmlTag.index, 'Persian content but no dir="rtl" anywhere.');
       const h1s = [...src.matchAll(/<h1\b/gi)];
-      if (h1s.length === 0) add('warn', 'h1', htmlTag.index, 'Page has no <h1>.');
+      if (h1s.length === 0 && !P.isLayout) add('warn', 'h1', htmlTag.index, 'Page has no <h1>.');
       if (h1s.length > 1) add('warn', 'h1', h1s[1].index, `Page has ${h1s.length} <h1> elements — use one.`);
     }
 
@@ -232,7 +235,7 @@ function auditFile(file) {
     }
 
     // form labels
-    const labelFor = new Set([...src.matchAll(/<label\b[^>]*\bfor\s*=\s*["']([^"']+)["']/gi)].map((m) => m[1]));
+    const labelFor = new Set([...src.matchAll(/<label\b[^>]*\b(?:for|htmlFor)\s*=\s*["']([^"']+)["']/gi)].map((m) => m[1]));
     for (const m of src.matchAll(/<(input|select|textarea)\b[^>]*>/gi)) {
       const t = m[0];
       if (/type\s*=\s*["'](hidden|submit|button|reset|image)["']/i.test(t)) continue;
@@ -247,7 +250,7 @@ function auditFile(file) {
 
   // 6. Generic-page tells + claims for the owner to confirm (--slop)
   if (flags.has('--slop') && !isCss) {
-    const r = slopAudit({ file, raw, src, vis: P.visibleText(src), lineOf, ignored, allow: loadAllow(path.dirname(file)) });
+    const r = slopAudit({ file, raw, src, vis: P.visibleText(src), lineOf, ignored, allow: loadAllow(path.dirname(file)), gateElsewhere: GATE_ANY });
     findings.push(...r.findings);
     CLAIMS.push(...r.claims);
   }
@@ -524,6 +527,9 @@ function evalText(stack, mode, R, page) {
   return { ratio: contrastRatio(fgc, bg), need: large ? 3 : 4.5, large, px, fgFrom: `${fgFrom}${opacity < 1 ? ` ×opacity ${opacity}` : ''}`, bgFrom, fgHex: toHex(fgc), bgHex: toHex(bg) };
 }
 
+/** Fixed reason codes for texts the static contrast check cannot resolve (never counted as passed). */
+const REASON = { dynamic: 'dynamic-class', component: 'component', image: 'gradient-or-image-bg', unknown: 'unknown-color', page: 'unknown-page-color' };
+
 /** Contrast audit of one page file. Returns { findings, checked, unresolved: [{file, line, mode, why, msg, text}] }. */
 function contrastFile(file, R, layoutBody) {
   const raw = fs.readFileSync(file, 'utf8');
@@ -540,8 +546,8 @@ function contrastFile(file, R, layoutBody) {
   for (const mode of modes) {
     const st = bodyEl && !bodyEl.dynamic ? styleOf(bodyEl, mode, R) : {};
     page[mode] = {
-      bg: st.bg && (st.bg.alpha ?? 1) === 1 ? { color: st.bg, from: `<body> ${st.bgFrom}` } : R.token(['--bg', '--color-bg'], mode) || (mode === 'light' ? { color: parseColor('#ffffff'), from: 'browser default white' } : null),
-      fg: st.fg ? { color: st.fg, from: `<body> ${st.fgFrom}` } : R.token(['--text', '--color-text'], mode) || (mode === 'light' ? { color: parseColor('#000000'), from: 'browser default black' } : null),
+      bg: st.bg && (st.bg.alpha ?? 1) === 1 ? { color: st.bg, from: `<body> ${st.bgFrom}` } : R.token(['--bg', '--color-bg', '--background', '--color-background'], mode) || (mode === 'light' ? { color: parseColor('#ffffff'), from: 'browser default white' } : null),
+      fg: st.fg ? { color: st.fg, from: `<body> ${st.fgFrom}` } : R.token(['--text', '--color-text', '--foreground', '--color-foreground'], mode) || (mode === 'light' ? { color: parseColor('#000000'), from: 'browser default black' } : null),
     };
   }
   const findings = [], unresolved = [];
@@ -549,7 +555,7 @@ function contrastFile(file, R, layoutBody) {
   const stack = [{ tag: '#root', line: 1, classes: [], dynamic: false, component: false, style: null }];
   let last = 0, svgDepth = 0;
   const onText = (text, idx) => {
-    if (svgDepth) return;
+    if (svgDepth || !P.isTextSegment(text)) return;
     const visible = text.replace(/@\w+(\s*\([^)]*\))?/g, ' ').replace(/&nbsp;|&#160;|&zwnj;/g, ' ').trim();
     if (!visible) return;
     const el = stack[stack.length - 1];
@@ -562,7 +568,7 @@ function contrastFile(file, R, layoutBody) {
     for (const mode of modes) {
       checked++;
       const r = evalText(stack, mode, R, page);
-      if (r.why) { unresolved.push({ file, line, mode, why: r.why, msg: r.msg, text: snippet }); continue; }
+      if (r.why) { unresolved.push({ file, line, mode, why: r.why, reason: REASON[r.why] || r.why, msg: r.msg, text: snippet }); continue; }
       const pair = `${r.fgFrom} (${r.fgHex}) on ${r.bgFrom} (${r.bgHex})`;
       const shown = (Math.floor(r.ratio * 100) / 100).toFixed(2);
       if (r.ratio < r.need) findings.push({ file, line, sev: 'error', rule: 'contrast', msg: `[${mode}] "${snippet}" ${pair} = ${shown}:1 — needs ${r.need}:1${r.large ? ' (large text)' : ''}.` });
@@ -570,6 +576,7 @@ function contrastFile(file, R, layoutBody) {
     }
   };
   for (const m of src.matchAll(P.TAG_RE)) {
+    if (!P.isTagAt(src, m.index)) continue; // e.g. a TypeScript generic like Promise<Metadata>
     onText(src.slice(last, m.index), last);
     last = m.index + m[0].length;
     const tag = m[2], lower = tag.toLowerCase();
@@ -613,6 +620,8 @@ const files = targets.flatMap((t) => {
   if (!fs.existsSync(t)) { console.error(`Not found: ${t}`); return []; }
   return walk(t);
 });
+// the html.js gate usually lives in one layout file (Blade layout, Next.js app/layout.tsx) — look across all files
+GATE_ANY = files.some((f) => GATE_RE.test(fs.readFileSync(f, 'utf8')));
 const all = files.flatMap(auditFile);
 
 // Placeholders the user must fill (convention: <!-- PLACEHOLDER: what to replace -->)
@@ -625,10 +634,17 @@ if (contrast) all.push(...contrast.findings);
 // --render: what the browser really shows (built HTML pages)
 const normT = (t) => String(t).replace(/[\s‌]+/g, ' ').trim();
 const renders = [];
-for (const page of valuesOf('--render')) {
-  const r = await renderAudit(page, { root: valuesOf('--render-root')[0] });
-  const out = { page, status: r.status, reason: r.reason, browser: r.browser, checked: 0, pass: 0, fail: 0, house: 0, unresolved: [], hidden: 0, resolvedStatic: [] };
+// --pages /,/about · also "index,about" (Git Bash on Windows rewrites a bare "/" to "C:/Program Files/Git/" — undone here)
+const pagePath = (p) => { const s = p.trim().replace(/^[A-Za-z]:[\\/](?:Program Files[\\/])?Git[\\/]?/i, '/').replace(/^index(\.html?)?$/i, '/'); return !s ? '/' : s.startsWith('/') ? s : `/${s}`; };
+const renderTargets = valuesOf('--render').flatMap((t) => (!/^https?:/i.test(t) && fs.existsSync(t) && fs.statSync(t).isDirectory()
+  ? (valuesOf('--pages')[0] || '/').split(',').map((p) => ({ target: t, sub: pagePath(p) })) : [{ target: t }]));
+for (const { target, sub } of renderTargets) {
+  const page = sub ? `${target} ${sub}` : target;
+  const r = await renderAudit(target, { root: valuesOf('--render-root')[0], page: sub });
+  const out = { page, status: r.status, reason: r.reason, browser: r.browser, kind: r.kind, checked: 0, pass: 0, fail: 0, house: 0, unresolved: [], hidden: 0, resolvedStatic: [] };
   renders.push(out);
+  // an unreachable or missing target is an error, never "skipped" (only a missing browser is skipped)
+  if (r.status === 'error') all.push({ file: page, line: 0, sev: 'error', rule: 'render', msg: `could not render: ${r.reason}` });
   if (r.status !== 'ok') continue;
   const seen = new Set();
   const once = (f) => { const k = f.rule + f.msg; if (!seen.has(k)) { seen.add(k); all.push(f); } };
@@ -640,7 +656,7 @@ for (const page of valuesOf('--render')) {
     if (run.width === firstW) for (const t of run.texts) {
       if (t.why === 'hidden') { out.hidden++; continue; }
       out.checked++;
-      if (t.why) { out.unresolved.push({ mode: run.mode, text: t.text, el: t.el, msg: t.msg }); continue; }
+      if (t.why) { out.unresolved.push({ mode: run.mode, text: t.text, el: t.el, msg: t.msg, reason: t.reason || 'unknown' }); continue; }
       const need = t.large ? 3 : 4.5, shown = (Math.floor(t.ratio * 100) / 100).toFixed(2);
       if (t.ratio < need) { out.fail++; once({ file: page, line: 0, sev: 'error', rule: 'render-contrast', msg: `[${run.mode}] "${t.text}" <${t.el}> ${t.fg} on ${t.bg} = ${shown}:1 in the browser — needs ${need}:1.` }); }
       else if (t.fa && t.px < 14 && t.ratio < 5.5) { out.house++; once({ file: page, line: 0, sev: 'warn', rule: 'render-fa-contrast', msg: `[${run.mode}] small Persian text "${t.text}" ${t.fg} on ${t.bg} = ${shown}:1 — house rule ≥ 5.5:1 under 14px.` }); }
@@ -665,8 +681,9 @@ for (const page of valuesOf('--render')) {
     const run = r.runs.find((x) => x.mode === u.mode && x.width === firstW && x.texts);
     const hit = run && run.texts.find((t) => !t.why && (normT(t.text).startsWith(normT(u.text).slice(0, 18)) || normT(u.text).startsWith(normT(t.text).slice(0, 18))));
     if (!hit) continue;
-    // a dynamic class is only measured if the framework that sets it really ran in the rendered page
-    if (u.why === 'dynamic' && !run.alpine && !run.livewire) { out.notApplied = (out.notApplied || 0) + 1; continue; }
+    // a dynamic class counts as measured only if something applied it: Alpine/Livewire ran, or the page was
+    // server-rendered by a framework (Next.js, Nuxt, SvelteKit, Astro) that writes the initial classes into the HTML
+    if (u.why === 'dynamic' && !run.alpine && !run.livewire && !run.ssr) { out.notApplied = (out.notApplied || 0) + 1; continue; }
     out.resolvedStatic.push({ ...u, ratio: hit.ratio, ok: hit.ratio >= (hit.large ? 3 : 4.5) });
   }
 }
@@ -703,13 +720,15 @@ if (flags.has('--json')) {
     console.log(`Contrast: ${contrast.checked} text check(s) · ${contrast.checked - fails - house - un.length} pass · ${fails} fail · ${house} below the Persian 5.5:1 house rule · ${un.length} could not resolve (${by('dynamic')} dynamic classes, ${by('component')} components, ${by('image')} background images, ${by('unknown')} unknown colors, ${by('page')} unknown page colors)`);
   }
   for (const r of renders) {
+    if (r.status === 'error') { console.log(`\nRender ${r.page}: ERROR — ${r.reason}.`); continue; }
     if (r.status !== 'ok') { console.log(`\nRender ${r.page}: skipped — ${r.reason}. Unresolved pairs stay unresolved (not passed).`); continue; }
     console.log(`\nRender ${r.page} (${path.basename(r.browser)}, local server, network blocked): ${r.checked} text check(s) · ${r.pass} pass · ${r.fail} fail · ${r.house} below the Persian 5.5:1 house rule · ${r.unresolved.length} could not resolve (NOT passed) · ${r.hidden} not visible (not checked)`);
-    for (const u of r.unresolved.slice(0, 10)) console.log(`  [${u.mode}] "${u.text}" <${u.el}> — ${u.msg}`);
+    if (r.unresolved.length) { const by = {}; for (const u of r.unresolved) by[u.reason] = (by[u.reason] || 0) + 1; console.log(`  ${r.unresolved.length} unresolved — never counted as passed: ${Object.entries(by).map(([k, v]) => `${v} ${k}`).join(', ')}`); }
+    for (const u of r.unresolved.slice(0, 10)) console.log(`  [${u.mode}] "${u.text}" <${u.el}> — ${u.reason}: ${u.msg}`);
     if (r.nojs) console.log(r.nojs.error ? `No-JS view: ${r.nojs.error}` : `No-JS view (JavaScript off, no measurement shims): ${r.nojs.checked} text element(s) · ${r.nojs.hidden} hidden that are visible with JS · ${r.nojs.empty} empty until JS runs`);
     if (contrast && contrast.unresolved.length) {
       const bad = r.resolvedStatic.filter((x) => !x.ok).length;
-      console.log(`Static "could not resolve" pairs measured in the browser: ${r.resolvedStatic.length} of ${contrast.unresolved.length} (${r.resolvedStatic.length - bad} pass, ${bad} fail; only the state shown on load); ${contrast.unresolved.length - r.resolvedStatic.length} still unresolved — check those by eye${r.notApplied ? ` (${r.notApplied} use dynamic classes but no Alpine/Livewire ran in the rendered page, so their state was never applied)` : ''}.`);
+      console.log(`Static "could not resolve" pairs measured in the browser: ${r.resolvedStatic.length} of ${contrast.unresolved.length} (${r.resolvedStatic.length - bad} pass, ${bad} fail; only the state shown on load); ${contrast.unresolved.length - r.resolvedStatic.length} still unresolved — check those by eye${r.notApplied ? ` (${r.notApplied} use dynamic classes but nothing applied them in the rendered page — no Alpine/Livewire ran and it is not server-rendered by a framework)` : ''}.`);
     }
   }
   if (flags.has('--slop')) {
