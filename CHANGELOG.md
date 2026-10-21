@@ -2,6 +2,13 @@
 
 ## 1.2.0 — 2026-10-19
 
+### Review fixes (2026-10-22, before merge)
+- **Touch targets 44px by default in the component recipes** (`components-and-states.md` §2): md buttons, tabs, text inputs and icon buttons are 44px; sizes are set with `min-h-11` instead of padding (padding landed at 29–43px in testing); logo links, standalone nav links and FAQ `<summary>` rows (`-m-4 p-4`, keeps the disclosure marker) included. Selftest guards it. The v2 Persian school page now passes `render-target` (7 controls of 29–43px → ≥ 44px).
+- `render-target` names every small control (up to 12, was 5). README: it reports warnings (it cannot measure WCAG 2.5.8's spacing exception), not errors.
+- **`docs/test-on-laravel.md`** — step-by-step test of a generated Blade page on a real Laravel 13 app (files to copy, `vite.config.js` without the build-time Bunny font, Alpine and Vazirmatn from npm, `@vite` head, routes for the page's forms, build/serve, checks, production). Frontend half run with the 13.x skeleton's Vite setup; PHP half marked unverified.
+- `stacks/laravel.md`: `--render http://127.0.0.1:8000/` on the running app; pitfalls for named form routes, standalone-preview tags vs `@vite`, the skeleton's Bunny font.
+- README: "What the audit cannot tell you" section; Laravel row updated.
+
 ### Changed — deliberate behavior change
 - **`audit.mjs`: Iran rules now follow the market, not the language.** A Persian page audited without an Iran market gets `foreign-host` **warnings** (privacy/speed) instead of errors. Projects whose market is Iran — `"market": "iran"` in `.web-ui-playbook.json`, or `--iran` / `--market iran` — still get **errors**. Persian language rules (RTL, digits, ZWNJ, typography) are unchanged and still follow the text. Selftest: `selftest.mjs` §3c.
 

@@ -126,7 +126,7 @@ Sources: reports A (general UI/UX) and B (modern web design), plus general pract
 - Any grid/flex child containing `truncate` text, an SVG chart or a wide table gets `min-w-0`. Otherwise it forces horizontal scroll on phones.
 
 ## 7. Touch targets, focus, z-index, icons
-- **Touch target:** 44×44px default, with ≥ 8px between targets. The WCAG 2.2 AA legal floor is 24×24px, for dense desktop tables only. *Conflict:* report A says 48px minimum, report B says 24px floor with 44–48 recommended → 44px chosen.
+- **Touch target:** 44×44px default, with ≥ 8px between targets. WCAG 2.2 AA (2.5.8) requires 24×24px as the minimum — use that floor for dense desktop tables only. Set the size with `min-h-11` (44px), not with padding (`components-and-states.md` §2). *Conflict:* report A says 48px minimum, report B says 24px floor with 44–48 recommended → 44px chosen.
 - **Focus ring:** `outline: 2px solid var(--color-focus); outline-offset: 2px;` on `:focus-visible`, with ≥ 3:1 contrast. `outline-none` without a replacement ring is a defect.
 - **Sticky headers:** set `scroll-padding-top` (logical: `scroll-padding-block-start`) to the header height + 16px, so focused or anchored items aren't hidden.
 - **z-index scale** (general practice): sticky table column 10, sticky table header 20, dropdown/popover 30, site header 40, overlay 50, modal/sheet 60, toast 70. No `z-[9999]`.

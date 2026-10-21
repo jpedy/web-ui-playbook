@@ -38,9 +38,16 @@ Hover must never be the only way to reveal something: touch has no hover `[Prove
 ## 2. Buttons
 | Size | Height | Padding-inline | Font | Use |
 |---|---|---|---|---|
-| sm | 32px | 12px | 13–14px/500 | dense tables and toolbars (desktop only) |
-| md (default) | 40px | 16px | 14–15px/500–600 | most UI |
-| lg | 44–48px | 20–24px | 16px/600 | primary CTA, mobile forms `[Proven: CTA 44–48px, padding 20–24px]` |
+| sm | 32px | 12px | 13–14px/500 | dense tables and toolbars **on desktop only** — below `md` it becomes md |
+| md (default) | **44px** (`min-h-11`); 40px allowed from `md` up in desktop-only UI (`min-h-11 md:min-h-10`) | 16px | 14–15px/500–600 | most UI |
+| lg | 48px (`min-h-12`) | 20–24px | 16px/600 | primary CTA, mobile forms `[Proven: CTA 44–48px, padding 20–24px]` |
+
+**Touch targets — set the size, don't derive it from padding.** Every tappable control on a page a phone can open is ≥ **44×44px** (house rule; `design-foundations.md` §7). WCAG 2.2 (2.5.8) requires 24×24px as the minimum — that floor is for dense desktop tables only. Padding + font size lands a few px short (found in testing: `py-2.5` + `text-sm` = 43px, `py-2` tabs = 39px), so give the box an explicit minimum and center its content:
+- Buttons, CTA links, tabs, segmented controls: `inline-flex items-center justify-center min-h-11` (+ `min-w-11` for icon-only).
+- Header logo link: `inline-flex items-center min-h-11` around the logo image.
+- Nav and footer links that stand alone (not inside a sentence): `inline-flex items-center min-h-11` (or `py-3` on a block link).
+- Disclosure / FAQ `<summary>`: the whole padded row is the target — `<details class="… p-4">` + `<summary class="-m-4 p-4 cursor-pointer">` (looks identical, ~60px tall). Keep its default `display: list-item`: `flex` removes the disclosure marker unless you draw your own chevron.
+- Exempt: links inside running text (WCAG inline exception). `audit.mjs --render` reports every other control under 44px at phone width (`render-target`).
 
 - **Variants:**
   - **primary** (solid `bg-primary text-primary-fg`) — **one per view/section**.
@@ -48,7 +55,7 @@ Hover must never be the only way to reveal something: touch has no hover `[Prove
   - **ghost** (text only, for tertiary actions).
   - **destructive** (`bg-danger`; only for the confirming action itself).
   - **link**.
-- Icon + label gap 8px; icon 16–20px. Icon-only buttons are square (40×40 / 44×44) with an `aria-label`.
+- Icon + label gap 8px; icon 16–20px. Icon-only buttons are square, 44×44 (`size-11`; 40×40 only in desktop-only toolbars), with an `aria-label`.
 - Full width on mobile for the primary action of a form (`w-full sm:w-auto`).
 - **Labels:** verb + object ("Create project", "Book a free class"). Persian: verbal noun ("ثبت سفارش", "رزرو کلاس رایگان"). Never "Submit", "Click here" or "Learn more" alone.
 - Prevent double-submit: disable the button and show the spinner after the first click.
@@ -63,7 +70,7 @@ Hover must never be the only way to reveal something: touch has no hover `[Prove
 
 | Control | Spec |
 |---|---|
-| Text input | height 40–44px (48px on mobile primary forms), padding-inline 12–14px, radius md, 1px border **`border-border-strong`** (≥ 3:1 vs bg — the lighter `border-border` is for cards/dividers only), **font-size ≥ 16px on mobile** (smaller makes iOS Safari zoom) |
+| Text input | height 44px (`min-h-11`; 48px on mobile primary forms; 40px only in dense desktop filters), padding-inline 12–14px, radius md, 1px border **`border-border-strong`** (≥ 3:1 vs bg — the lighter `border-border` is for cards/dividers only), **font-size ≥ 16px on mobile** (smaller makes iOS Safari zoom) |
 | Label | 14px/500, 6–8px gap to the field |
 | Helper text | 13–14px muted, below the field |
 | Error message | 13–14px danger + icon, below the field, specific fix: "Enter an 11-digit mobile number starting with 09" `[Proven, report B]` |
@@ -104,7 +111,7 @@ Hover must never be the only way to reveal something: touch has no hover `[Prove
 | App sidebar | 240–260px expanded, 48–56px icon rail collapsed; active item = primary-subtle bg + 2px indicator at the start edge `[Proven]` |
 | Bottom nav (mobile apps; Iranian consumer sites) | 4–5 tabs, 56–64px + `env(safe-area-inset-bottom)`, icon 24 + label 11–12px (Persian ≥ 12px), active = primary color + filled icon |
 | Breadcrumbs | 13–14px muted, separator chevron mirrored in RTL, current page not a link (`aria-current="page"`) |
-| Tabs | 40–44px tall, 2px active underline, arrow-key navigation, `role="tablist"`; scroll horizontally on mobile instead of wrapping |
+| Tabs | 44px tall (`min-h-11`), 2px active underline, arrow-key navigation, `role="tablist"`; scroll horizontally on mobile instead of wrapping |
 | Footer | 3–4 link columns, contact, legal, language switch; Iran: eNamad seal + phone (see `iran-market.md`) |
 | Skip link | first focusable element: "Skip to content" / «رفتن به محتوای اصلی» |
 

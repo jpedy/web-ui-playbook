@@ -112,7 +112,7 @@ Use this for SaaS apps, admin panels, CRMs, dashboards, student and customer por
 - **Command palette (`Cmd+K` / `Ctrl+K`):**
   - Opens in < 50ms with the input focused.
   - Width 560–640px, max-height 420px, positioned 15–20vh from the top.
-  - Items 40–44px.
+  - Items 44px (40px allowed: the palette is a desktop keyboard tool).
   - 5–8 recent/suggested actions before typing; fuzzy search.
   - Backdrop `rgb(0 0 0 / .4)` + `backdrop-filter: blur(4px)`.
   - Opens with 120ms `cubic-bezier(0.16,1,0.3,1)`.

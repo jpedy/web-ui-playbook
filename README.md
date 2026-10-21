@@ -21,7 +21,7 @@ What web-ui-playbook does, every time:
 
 | Stack | Design rules | Tokens export (`--format`) | Logo integration | Audit: source checks | Audit: `--render` | Tested | Date |
 |---|---|---|---|---|---|---|---|
-| **Laravel** (Blade, Livewire, Inertia, Filament) | ✓ | `tailwind4` (default) | `head-snippet.blade.php` | ✓ `.blade.php` | ✓ on the HTML Laravel serves | **partly** — v2 Persian school page (Blade + Alpine): source audit, and the rendered page saved as HTML. Not run on a PHP server (no PHP on the test machine) | 2026-10-17/18 |
+| **Laravel** (Blade, Livewire, Inertia, Filament) | ✓ | `tailwind4` (default) | `head-snippet.blade.php` | ✓ `.blade.php` | ✓ on the running app (local URL) or its saved HTML | **partly** — Persian school page (Blade + Alpine): source audit; its frontend built with the 13.x skeleton's Vite setup (Vite 8.3.5) and render-audited, 0 · 0. **Not run on PHP/Laravel** (no PHP on the test machine) — manual test: [`docs/test-on-laravel.md`](docs/test-on-laravel.md) | 2026-10-22 |
 | **Next.js 16** App Router (shadcn/ui, next-intl) | ✓ | `tailwind4`, `shadcn` | `next-app/` (file conventions, manifest, viewport) | ✓ `.tsx/.jsx` | ✓ on `next start` (local URL) or the static export | **yes** — Persian shop (Iran, production server) and English SaaS (global, static export): 0 errors · 0 warnings | 2026-10-18 |
 | **Static HTML/CSS/JS** | ✓ | `css-variables`, `tailwind4` | `head-snippet.html` | ✓ `.html`, broken links, clean URLs | ✓ on the folder (`--pages`) | **yes** — English two-page portfolio (global): 0 · 0 | 2026-10-18 |
 | **WordPress 7.1** (block + classic themes, WooCommerce basics) | ✓ | `wordpress` (theme.json v3 + dark) | `wordpress/` (site icon 512, functions snippet) | ✓ templates, `.php` (`stack: wordpress` only), theme.json colors | ✓ on the running site (local URL) | **runtime-tested in WordPress Playground (PHP in WebAssembly, SQLite) — not on real hosting.** Persian block theme, and Persian classic theme + WooCommerce cart (Iran): 0 · 0 | 2026-10-18/19 |
@@ -94,7 +94,7 @@ All output goes into your project (`--out`); the scripts refuse to write into th
 - **`--contrast`** — every text element against its background in light and dark, from your tokens. Reads Tailwind tokens, plain CSS variables, shadcn tokens and WordPress `theme.json` presets. Pairs it cannot determine are listed as "could not resolve" with a reason (`dynamic-class`, `component`, `css-rule` — colored by a plain-CSS rule, `gradient-or-image-bg`, `unknown-color`) and **never counted as passed**; `--render` then measures them.
 - **`--slop`** — generic-page tells as warnings (stock phrases and generic buttons from `scripts/data/fa-slop.json`, layout and motion habits), and the list of claims for you to confirm. Allow a phrase or rule in your project with `.slop-allow.json`.
 - **`--render <target>`** — opens built pages in your installed Chrome/Edge (headless, network blocked) and measures what the browser really shows after JS ran: contrast in light and dark, overflow and headline lines at 1440 / 768 / 375 px (each page framed at the exact width), fonts that loaded, requests that tried to leave the machine. The target is a file (`public/index.html`), a folder of built pages (`out`, `dist`, with `--pages /,about`), or a **local** URL of your running dev or production server (`http://localhost:3000` — Laravel, Next.js, WordPress; proxied so nothing leaves the machine, non-local hosts are refused). Also reported:
-  - `render-target` — tap targets under 24 px (error) or 24–44 px (warning) at phone width; links inside running text are exempt.
+  - `render-target` — tap targets under 44 px at phone width (warnings; the message names each control and says when it is under the WCAG 2.2 minimum of 24 px — the audit cannot measure the spacing exception, so it never fails the page on its own); links inside running text are exempt.
   - `render-foreign-ref` — references to foreign hosts in the delivered HTML that Chrome never fetched (e.g. an emoji fallback script URL); errors for market Iran.
   - Whether the page was server-rendered, and the measured result for every text the static `--contrast` could not resolve.
   - **Measurement adjustments show an end state.** Headless Chrome renders no frames, so before measuring `--render` routes `requestAnimationFrame` through timers, reports every element as scrolled into view and switches transitions/animations off. Results describe the page *after* every reveal — not what a visitor sees mid-animation.
@@ -103,10 +103,21 @@ All output goes into your project (`--out`); the scripts refuse to write into th
 
 ### Self-tests
 ```bash
-node skills/web-ui-playbook/scripts/selftest.mjs      # profile, stack detection, audit fixtures per stack, --slop, --release, --render, no-JS view (116 checks; 98 without a browser)
+node skills/web-ui-playbook/scripts/selftest.mjs      # profile, stack detection, audit fixtures per stack, --slop, --release, --render, no-JS view (117 checks; 99 without a browser)
 node skills/brand-color-system/scripts/selftest.mjs   # color math, palettes, contrast, 6 token formats (3865 checks)
 node skills/brand-logo-studio/scripts/selftest.mjs    # shaping, bidi, validators, kit export per stack (165 checks; 157 without a browser)
 ```
+
+## What the audit cannot tell you
+
+The audit finds **known mistakes** — low contrast, foreign hosts, missing `lang`/`dir`, small tap targets, placeholders, generic-page tells. A clean result means none of those were found, nothing more:
+- **It does not judge whether a page looks good, reads well or is trustworthy.** Layout rhythm, hierarchy, copy, whether the offer is clear and whether a visitor would believe it need a person looking at the page; the skill's report includes a by-eye "substance" review for that, and lists every number and quote for you to confirm.
+- **It cannot check truth.** Prices, claims, testimonials, licenses and legal seals are listed for you to confirm, never verified.
+- **Static checks see only the source.** Classes built in code, components from other files and colors set by plain CSS are reported as "could not resolve" — `--render` measures them in a real browser, but only in the state shown after load (first tab, closed menus).
+- **WordPress results come from WordPress Playground** (PHP in WebAssembly, SQLite). They do not prove behavior on real hosting: MySQL, the host's PHP version and extensions, caching and security plugins, CDNs and server configuration can all change the result.
+- **Laravel is partly tested until it has run on a real Laravel app.** The Blade source and the Vite build were checked, the PHP side was not; [`docs/test-on-laravel.md`](docs/test-on-laravel.md) is the manual test that closes the gap.
+- **Tier 2 stacks** (Vue/Nuxt, Svelte/SvelteKit, Astro, React SPA) have guidance and best-effort source reading, but no test project.
+- macOS and Linux browser paths were not tested.
 
 ## Windows notes (tested on Windows 11, Node 24, Chrome)
 - Paths with spaces and `&` work (the whole suite was developed in a folder named `UI&UX Skill`).
@@ -117,7 +128,7 @@ node skills/brand-logo-studio/scripts/selftest.mjs    # shaping, bidi, validator
 
 ## Known limitations
 - macOS and Linux browser paths are implemented but were **not tested**.
-- Laravel was not run on a PHP server and WordPress only in WordPress Playground (SQLite/WebAssembly) — see [Supported stacks](#supported-stacks). Tier 2 stacks have guidance but no test project.
+- What a clean audit does and does not prove (Playground, Laravel, Tier 2): [What the audit cannot tell you](#what-the-audit-cannot-tell-you).
 - On Windows, `npm run …` breaks in folders whose path contains `&` (cmd.exe); run the tool through `node node_modules/<tool>/…` there (details in the adapters). The skill's own scripts are not affected.
 - `--render` measures the state shown after load (first tab, closed menus) and, because of its measurement adjustments, the end state of every reveal — real visitors may see in-between states. Whether content survives without JavaScript is the separate no-JS view.
 - `--slop` and `--contrast` read source files statically; they cannot verify truth, judge substance or see components rendered elsewhere. `.vue`, `.svelte` and `.astro` parsing is best-effort.
@@ -138,6 +149,7 @@ skills/brand-logo-studio/  SKILL.md · references/ · scripts/ (directions, expo
                          proof-sheet, validate-render, lib/, selftest) · assets/fonts (FONTS.md) · vendor/ (VERSIONS.md)
 THIRD_PARTY_NOTICES.md   fonts, WASM libraries, Tailwind palette data, taste-skill ideas (cited by file and line)
 CHANGELOG.md
+docs/test-on-laravel.md  manual test of a generated Blade page on a real Laravel app (PHP half not run here)
 ```
 
 ## Notes

@@ -180,6 +180,9 @@ for (const f of fs.readdirSync(STACKS).filter((n) => n.endsWith('.md') && !['REA
   check(!missing.length && /## Verified on\n[^\n]*⏱[^\n]*20\d\d-\d\d-\d\d/.test(t), `adapter ${f}: all template headings and a dated "Verified on" line${missing.length ? ` (missing: ${missing.join(', ')})` : ''}`);
   check(t.split('\n').length <= 160, `adapter ${f}: ≤ 160 lines (${t.split('\n').length})`);
 }
+// touch targets: the component recipes default to 44px, set with min-h-11 (not padding) — the v2 school page measured 29–43px
+const comp = fs.readFileSync(path.join(DIR, '..', 'references', 'components-and-states.md'), 'utf8');
+check(/^\| md \(default\) \| \*\*44px\*\* \(`min-h-11`\)/m.test(comp) && /^\| Tabs \| 44px tall \(`min-h-11`\)/m.test(comp) && /^\| Text input \| height 44px/m.test(comp) && /<summary class="-m-4 p-4/.test(comp), 'component recipes: md button, tabs, inputs and FAQ summary default to ≥ 44px');
 
 // 4. render
 const chrome = findChrome();

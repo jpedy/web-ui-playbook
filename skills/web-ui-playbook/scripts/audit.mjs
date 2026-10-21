@@ -716,7 +716,7 @@ for (const { target, sub } of renderTargets) {
       const small = run.targets.filter((t) => Math.min(t.w, t.h) < 44);
       for (const t of small.filter((x) => Math.min(x.w, x.h) < 24)) once({ file: page, line: 0, sev: 'warn', rule: 'render-target', msg: `${tag} <${t.el}> "${t.text}" is ${t.w}×${t.h}px — below the 24px floor (WCAG 2.5.8 unless it is spaced 24px from other targets); make it ≥ 44px tall.` });
       const mid = small.filter((x) => Math.min(x.w, x.h) >= 24);
-      if (mid.length) once({ file: page, line: 0, sev: 'warn', rule: 'render-target', msg: `${tag} ${mid.length} control(s) between 24 and 44px (house rule 44px): ${mid.slice(0, 5).map((t) => `<${t.el}> "${t.text}" ${t.w}×${t.h}`).join(', ')}${mid.length > 5 ? ' …' : ''}.` });
+      if (mid.length) once({ file: page, line: 0, sev: 'warn', rule: 'render-target', msg: `${tag} ${mid.length} control(s) between 24 and 44px (house rule 44px): ${mid.slice(0, 12).map((t) => `<${t.el}> "${t.text}" ${t.w}×${t.h}`).join(', ')}${mid.length > 12 ? ` and ${mid.length - 12} more` : ''}.` });
     }
     const refs = (run.refs || []).filter((h) => !run.external.some((e) => e.startsWith(h)));
     if (refs.length) once({ file: page, line: 0, sev: IRAN ? 'error' : 'warn', rule: 'render-foreign-ref', msg: `the rendered page references other hosts in scripts, styles or media (not requested by this browser, but other devices may): ${refs.join(', ')}${IRAN ? ' — they fail or crawl in Iran; remove or self-host them' : ''}.` });

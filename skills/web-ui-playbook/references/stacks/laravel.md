@@ -72,16 +72,19 @@ Put the `html.js` gate in the layout `<head>` before styles: `<script>document.d
 Blade components own the ARIA (labels, `aria-describedby` for errors, `aria-expanded` on Alpine toggles); Livewire re-renders must keep focus — after a validation error move focus to the first invalid field.
 
 ## Build and test
-`npm run dev` (Vite) + `php artisan serve` (needs PHP) · `npm run build` → `public/build/`. No PHP on the machine: build the CSS with Vite/Tailwind and preview static Blade output saved as HTML (`scripts/serve.mjs`).
+`npm run dev` (Vite) + `php artisan serve` (needs PHP), or `composer run dev` for both · `npm run build` → `public/build/` (with `manifest.json`). Alpine without Livewire: `npm i alpinejs` and `import Alpine from 'alpinejs'; window.Alpine = Alpine; Alpine.start();` in `resources/js/app.js` — no copied `alpine.min.js`. No PHP on the machine: build with Vite and preview static Blade output saved as HTML (`scripts/serve.mjs`). The full manual test of a generated page on a real Laravel app is `docs/test-on-laravel.md` in the plugin repository (frontend half run with Vite 8.3.5 on 2026-10-22; PHP half ⚠ not run).
 
 ## Audit and render recipe
 - Source: `node <skill>/scripts/audit.mjs resources/views --contrast --slop` (CSS folders come from `.web-ui-playbook.json`; add `--css resources/css` without a profile). Before launch: `--release`.
-- Rendered: save the page Laravel serves into `public/` so `/build/...` resolves — `curl -s http://127.0.0.1:8000/ -o public/__audit.html` — then `--render public/__audit.html` (delete the file afterwards).
+- Rendered: point `--render` at the running app — `--render http://127.0.0.1:8000/ --pages /,/courses` (local URLs only; the audit proxies it and blocks every other host). Without a running server: save the served page into `public/` so `/build/...` resolves (`curl -s http://127.0.0.1:8000/ -o public/__audit.html`, then `--render public/__audit.html`, delete it afterwards).
 - Blade parsing reads `class`, `:class`, `x-bind:class`, `->class()`; classes built in PHP, `@class([...])` conditions and components rendered elsewhere are reported as **could not resolve** and need `--render`.
 
 ## Known pitfalls
 - Tailwind Play CDN or a font CDN `<link>` left from a starter kit; Filament's default Bunny font in an Iran panel.
 - Alpine added twice (CDN + Livewire) → double-initialized components.
+- A page with a form posts to a named route (`route('placement.store')`): Blade throws "Route [...] not defined" until `routes/web.php` has it — list them with `grep -n "route(" resources/views/*.blade.php` and add each one (a stub is fine for a design test).
+- A standalone preview links `build/app.css`, a font and `alpine.min.js` by hand; in the Laravel app those three tags become one `@vite([...])` line, or the page loads stale or missing assets.
+- The 13.x skeleton's `vite.config.js` loads `bunny('Instrument Sans')` at build time — remove it when the page does not use that font (and always for market `iran`).
 - `wire:model.blur` copied from v3 docs → no server validation on blur in Livewire 4 (use `.live.blur`).
 - Vanilla JS widgets (Preline/Flowbite `autoInit`) not re-initialized after `wire:navigate`.
 - `tailwind.config.js` + `@apply` soup recreating Bootstrap; CSS Modules mixed with Tailwind v4 (slow builds).
